@@ -15,7 +15,7 @@ window.Verbs = (function () {
 
   // ---------- shared bits: a remark that fades, the stamp, a thud ----------
   function remark(text) { document.querySelectorAll(".vsay").forEach(e => e.remove()); const e = el("vsay", text); setTimeout(() => e.remove(), 3300); }
-  function thud() { if (window.FX) FX.thud(); } // the one shared, iOS-unlocked audio context in fx.js (and it respects the sound switch; this used to open a new context on every stamp and ignore it)
+  function thud() { if (window.FX) FX.sfx("stamp"); } // the one shared, iOS-unlocked audio context in fx.js (and it respects the sound switch; this used to open a new context on every stamp and ignore it)
   async function stamp(text, sub) { const e = el("vstamp", `${text}${sub ? `<small>${sub}</small>` : ""}`); thud(); await wait(window.__fastVerbs ? 30 : 1300); return e; }
 
   // ---------- the parchment ----------

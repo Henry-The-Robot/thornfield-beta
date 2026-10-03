@@ -4,6 +4,13 @@ All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added: sound and music
+- **Score** (`music.js`): a small generative composer in six moods (farm, town waltz, rain, night lullaby, tense, the bailiff's march), all synthesized with WebAudio, so no audio files and it works offline. The score follows the game: the bailiff's march in chapter 1, night music while you sleep, rain on rainy days, the town waltz east of the village square, a heartbeat when the chest can't cover the next pay-day or the Duke's order is open.
+- **24 sound effects** (`fx.js`): footsteps, tilling, planting, watering, harvest, shipping, page turns, button taps, error buzz, stamp, sleep and morning, mastery chime, rain, and more. Each character has their own typewriter voice (pitch and timbre).
+- **On by default** (after the first tap, which iOS requires), with two switches in the menu: Music and Sound effects. The old one-switch setting is honoured if it was explicitly off. iOS ringer-switch workaround (a "playback" audio session).
+- `sound.html`: a sound check page (every mood, effect and voice on a button) so the music can be judged by ear.
+- `tests/audio.html` (run with `node tests/run-html.js`): renders every mood offline and checks the signal (non-silent, no clipping, deterministic, each different, node budget), runs all effects and the live scheduler against a fake context, and checks the preferences.
+
 ### Creative lead's list (v0.3.2 candidates, one PR each into `next`)
 - 1 Overtrading loses: one `R.duke` order (132 sacks, 28-day terms) shared by story and sandbox; `test-crown` asserts careful pays, overtrader and reckless lose.
 - 2 Mastery: only right answers from the verbs count; hints, walk-throughs and passive screens don't; `Transcript.evidence`.

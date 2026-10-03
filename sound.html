@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sound check — Ledger &amp; Crown</title><link rel="stylesheet" href="style.css">
+<style>body{padding:16px}.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.row button{min-height:48px;font-size:17px}h2{margin-top:22px}.now{font-weight:bold;color:var(--crimson)}</style></head>
+<body><div class="page"><h1>Sound check</h1>
+<p class="sub">Every piece of the score and every sound effect, so you can judge them by ear. Tap anything once first (iOS only starts audio from a tap). Turn the ringer on.</p>
+<h2>Music <span class="now" id="now"></span></h2><div class="row" id="moods"></div>
+<p><button class="btn alt" id="stop">Stop the music</button> <label><input type="checkbox" id="mus" checked> Music on</label> <label><input type="checkbox" id="sfx" checked> Effects on</label></p>
+<h2>Sound effects</h2><div class="row" id="sfxs"></div>
+<h2>Character voices (the typewriter blips)</h2><div class="row" id="voices"></div>
+<p class="hint">Rain: <button class="btn alt" id="rainon">rain on</button> <button class="btn alt" id="rainoff">rain off</button></p></div>
+<script src="fx.js"></script><script src="music.js"></script>
+<script>
+const $ = id => document.getElementById(id), mk = (par, label, fn) => { const b = document.createElement("button"); b.className = "btn"; b.textContent = label; b.onclick = fn; $(par).appendChild(b); };
+Music.moods.forEach(m => mk("moods", m, () => { FX.unlock(); FX.setMusic(true); $("mus").checked = true; Music.start(); Music.setMood(m); $("now").textContent = "now playing: " + m; }));
+FX.names.forEach(n => mk("sfxs", n, () => FX.sfx(n)));
+["maud", "crane", "ashby", "hobb", "tomas", "ezra", "duke", "pell", "pedlar", "mira", "abbey"].forEach(w => mk("voices", w, () => { for (let i = 0; i < 9; i++) setTimeout(() => FX.blip(w, i), i * 70); }));
+$("stop").onclick = () => { Music.stop(); $("now").textContent = ""; };
+$("mus").onchange = e => FX.setMusic(e.target.checked); $("sfx").onchange = e => FX.setSfx(e.target.checked);
+$("rainon").onclick = () => FX.rain(true); $("rainoff").onclick = () => FX.rain(false);
+</script></body></html>

@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>WS2 UI kit</title></head><body><pre id="out">running</pre>
 <!-- Design tokens, readable sizes, one-row HUD clear of the Menu button, Books strip opens on a spotlight, mouse-only number pad
-     (and inputmode=none on touch), fast travel, day-end card, sound muted by default.
+     (and inputmode=none on touch), fast travel, day-end card, sound on by default (effects and music, until the player turns them off).
      Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=30000 --dump-dom tests/ws2-ui.html -->
 <script>
 const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
@@ -24,7 +24,7 @@ function load(q, w, h) { return new Promise(res => { const f = document.createEl
     out.push(`[${name}] books strip closes again: ${!d.getElementById("books").classList.contains("open")}`);
     const x0 = G.pl.x; d.getElementById("travelbtn").click(); await sleep(30); out.push(`[${name}] Travel button opens a map with 6 stops: ${d.querySelectorAll("#travel [data-i]").length === 6}`);
     d.querySelector('#travel [data-i="2"]').click(); await sleep(700); out.push(`[${name}] Mill stop moves the player: ${G.pl.x !== x0 && Math.floor(G.pl.x / 16) === 34 && Math.floor(G.pl.y / 16) === 7}`);
-    out.push(`[${name}] sound muted by default: ${w.FX.muted}`); w.G.hud();
+    out.push(`[${name}] sound on by default (effects and music): ${w.FX.sfxOn && w.FX.musicOn}`); w.G.hud();
     const cash0 = G.s.bal.cash; G.act(() => { G.s.bal.cash += 5; G.s.bal.equity = (G.s.bal.equity || 0); return { ok: true }; }); await sleep(40);
     out.push(`[${name}] cash change spawns coins and a floating number: ${d.querySelectorAll("i.coin").length > 0 && d.querySelectorAll(".fl").length > 0}`);
     out.push(`[${name}] errors: ${JSON.stringify(errs)}`); f.remove();

@@ -11,7 +11,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
     resume() { log.resumes++; this.state = "running"; return Promise.resolve(); }
     createBuffer() { return {}; } createBufferSource() { log.sources++; return { connect() {}, start() { log.started++; }, set buffer(v) {} }; }
     createOscillator() { log.osc++; return { type: "", frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, start() {}, stop() {} }; }
-    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; } }
+    createGain() { return { gain: { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} }, connect() {} }; }
+    createDynamicsCompressor() { return { threshold: {}, ratio: {}, connect() {} }; } createBiquadFilter() { return { frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, Q: {}, connect() {} }; } get sampleRate() { return 22050; } }
   w.AudioContext = Mock; w.webkitAudioContext = Mock; // installed AFTER load, before any gesture
   out.push(`nothing is created before a gesture (made ${log.made}): ${log.made === 0}`);
   d.body.dispatchEvent(new w.PointerEvent("pointerdown", { bubbles: true })); await sleep(20);

@@ -123,19 +123,19 @@
     const b = buildingAt(x, y); if (b) return b.id === "house" ? desk() : talk(b.who);
     const p = plotAt(x, y);
     if (p) { const r = act(() => S.act(s, p.i));
-      if (r.ok) { floatAt(x, y, { till: "Tilled", plant: "Planted", water: "Watered", harvest: "+3 sacks", sprinkler: "Sprinkler set", pickup: "Sprinkler picked up" }[r.msg] || "", r.msg === "harvest" ? "#7a5a10" : "#2a4a7a"); story("plant"); if (r.msg === "harvest") story("harvest"); }
+      if (r.ok) { FX.sfx({ till: "till", plant: "plant", water: "water", harvest: "harvest", sprinkler: "sprinkler", pickup: "sprinkler" }[r.msg]); floatAt(x, y, { till: "Tilled", plant: "Planted", water: "Watered", harvest: "+3 sacks", sprinkler: "Sprinkler set", pickup: "Sprinkler picked up" }[r.msg] || "", r.msg === "harvest" ? "#7a5a10" : "#2a4a7a"); story("plant"); if (r.msg === "harvest") story("harvest"); }
       else if (r.msg) say(null, r.msg); return; }
     if (x === BOARD.x && y === BOARD.y) return noticeBoard();
     if (x === WELL.x && y === WELL.y) say(null, "The town well. Cold, clear water.");
   }
   function act(fn) { // run an engine action, then float the Cash change and feed the transcript
-    const c0 = s.bal.cash, r = fn(); drainUses(); hud();
+    const c0 = s.bal.cash, r = fn(); drainUses(); hud(); if (r && r.ok === false && r.msg) FX.sfx("error");
     if (s.bal.cash !== c0) { floatHud("cash", s.bal.cash - c0); FX.cash(s.bal.cash - c0, $("h-cash"), $("wrap")); }
     return r;
   }
   const story = (evt, info) => { if (storyOn) Story.after(evt, info); };
   let usePtr = 0;
-  function drainUses() { while (usePtr < s.uses.length) { const u = s.uses[usePtr++], ch = TR.use(u.id, u.well, s.day); if (ch) toast(ch === "mastered" ? `Mastered: ${TR.name(u.id)} ★` : `Transcript: ${TR.name(u.id)} (${ch})`); } }
+  function drainUses() { while (usePtr < s.uses.length) { const u = s.uses[usePtr++], ch = TR.use(u.id, u.well, s.day); if (ch) { FX.sfx(ch === "mastered" ? "win" : "chime"); toast(ch === "mastered" ? `Mastered: ${TR.name(u.id)} ★` : `Transcript: ${TR.name(u.id)} (${ch})`); } } }
   // ---------- dialogue: one box, Promise-based; choices, a number field, highlights ----------
   const dlgOpen = () => $("dlg").style.display === "flex";
   function dlg(o) { // o: {who, text, choices:[label|{label,disabled}], input, spot} -> Promise<{i, v}>
@@ -152,7 +152,7 @@
       if (o.input) numberPad(d, (o.choices || ["Next"])[0]); // the pad goes after the choice buttons, so button order (and the number keys) stay as they were
       d.style.display = "flex"; keys.up = keys.down = keys.left = keys.right = false;
       if (o.input && !TOUCH) setTimeout(() => $("num") && $("num").focus(), 30); // on touch the pad types; no keyboard to cover the dialog
-      if (!fast && !q.has("auto")) FX.type(d.querySelector(".tx"));
+      FX.sfx("open"); if (!fast && !q.has("auto")) FX.type(d.querySelector(".tx"), undefined, i => FX.blip(who, i));
     });
   }
   // On-screen number pad (0-9, minus, backspace, Check) for the ask and haggle boxes: mouse and touch alike (WS2).
@@ -245,6 +245,7 @@
       <p><button class="btn gold" id="pz-resume" style="width:100%">Resume</button></p>
       <p><button class="btn alt" id="pz-restart" style="width:100%">Restart today (from this morning's save)</button></p>
       <p><button class="btn alt" id="pz-map" style="width:100%">Save and quit</button></p>
+      <p><button class="btn alt" id="pz-music" style="width:100%"></button></p>
       <p><button class="btn alt" id="pz-sound" style="width:100%"></button></p>
       <p><button class="btn alt" id="pz-feedback" style="width:100%">Copy feedback details</button></p>
       ${askSkip ? `<p><button class="btn alt" id="pz-skip" style="width:100%">Report a problem and skip this question</button></p><p class="hint">Use this only if the game seems broken. The lesson won't count as mastered, and Maud will bring it up again later. Copies feedback details too, so you can paste them to Kyle.</p>` : ""}
@@ -255,8 +256,9 @@
     $("pz-restart").onclick = () => location.reload();
     $("pz-map").onclick = () => { save(); location.href = "index.html"; };
     $("pz-feedback").onclick = () => copyFeedback();
-    const snd = () => $("pz-sound").textContent = FX.muted ? "🔇 Sound: off (tap to turn on)" : "🔊 Sound: on (tap to mute)"; snd();
-    $("pz-sound").onclick = () => { FX.setSound(FX.muted); snd(); };
+    const snd = () => { $("pz-sound").textContent = FX.sfxOn ? "🔔 Sound effects: on (tap to mute)" : "🔕 Sound effects: off (tap to turn on)"; $("pz-music").textContent = FX.musicOn ? "🎵 Music: on (tap to mute)" : "🎵 Music: off (tap to turn on)"; }; snd();
+    $("pz-sound").onclick = () => { FX.setSfx(!FX.sfxOn); snd(); };
+    $("pz-music").onclick = () => { FX.setMusic(!FX.musicOn); snd(); };
     if ($("pz-skip")) $("pz-skip").onclick = () => {
       try { const log = JSON.parse(localStorage.getItem("lc_bug_reports") || "[]"); log.push({ at: new Date().toISOString(), day: s.day, stage: storyOn ? Story.state.stage : "sandbox", question: ($("dlg").querySelector(".tx") || {}).textContent, expected: window.__want }); localStorage.setItem("lc_bug_reports", JSON.stringify(log)); } catch (e) {}
       copyFeedback();
@@ -447,7 +449,7 @@
   function maud() { const c = S.coach(s); say("maud", c ? c.text : "Nothing to add. The books look sound to me."); }
   function crate() {
     const opts = S.openOrders(s).sort((a, b) => a.due - b.due).map(o => [`Ship ${o.sacks} to ${S.NAMES[o.who]} (due day ${o.due})`,
-      () => { const r = act(() => S.deliver(s, o.id)); if (r.ok) { floatAt(CRATE.x, CRATE.y - 1, `Sold: ${o.value}`, "#2a5a2a"); story("deliver", o); } else say(null, r.msg); }, s.sacks < o.sacks]);
+      () => { const r = act(() => S.deliver(s, o.id)); if (r.ok) { FX.sfx("ship"); floatAt(CRATE.x, CRATE.y - 1, `Sold: ${o.value}`, "#2a5a2a"); story("deliver", o); } else say(null, r.msg); }, s.sacks < o.sacks]);
     opts.push(["Close", null]);
     say(null, `The shipping crate: the carter takes it today. Barn: ${s.sacks} sacks. Open orders need ${S.committed(s)}.${opts.length === 1 ? "<br>No orders yet: agree one in town first." : ""}`, opts);
   }
@@ -518,14 +520,14 @@
     say("maud", right ? `Right: ${s.bal.cash}. You read the night correctly.` : `You said ${g.v}; Cash is ${s.bal.cash}.<br>${g.before} + ${g.f.cin} collected − ${g.f.wages} wages and interest − ${g.f.bills} bills${g.f.fines ? ` − ${g.f.fines} forfeits` : ""} = ${g.f.close}${g.f.close !== s.bal.cash ? ", plus whatever else happened overnight" : ""}. Start from today's Cash, add what comes in, take away what goes out.`);
   }
   function doSleep() {
-    atDesk = false; const n0 = s.log.length, c0 = s.bal.cash, day0 = s.day; act(() => S.sleep(s));
+    atDesk = false; const n0 = s.log.length, c0 = s.bal.cash, day0 = s.day; FX.sfx("sleep"); act(() => S.sleep(s));
     const notes = s.log.slice(0, s.log.length - n0).reverse().map(l => l.t).slice(0, 4);
     // the day-end card: what Cash did, who still owes you, what was lost
     const owed = {}; s.invoices.forEach(v => owed[v.who] = (owed[v.who] || 0) + v.amount);
     const info = { day: day0, d: s.bal.cash - c0, owes: Object.entries(owed).map(([w, a]) => `${S.NAMES[w] || w} owes you <b>${a}</b>`), losses: s.journal.filter(j => j.type === "loss" && j.day === s.day - 1).map(j => j.memo) };
     if (s.over) return fast ? closeBooks() : night("The end of spring", notes, closeBooks, info);
     pl.x = 6 * T + 8; pl.y = 7 * T + 12; pl.dir = "down"; save();
-    const morning = () => { morningBark(); story("morning"); lossLesson(); revealPrediction(); };
+    const morning = () => { FX.sfx("morning"); morningBark(); story("morning"); lossLesson(); revealPrediction(); };
     if (fast) return morning();
     night(`Day ${s.day} · ${S.rain(s.day) ? "Rain" : "Sunny"}`, notes, morning, info);
   }
@@ -607,7 +609,7 @@
   // their own buttons, because they finish a step of the story.
   const CLOSABLE = new Set(["plan", "ledger", "notebook", "transcript", "explain"]);
   function showPanel(k, html, locked) {
-    panelKind = { k, locked };
+    panelKind = { k, locked }; FX.sfx("page");
     const x = CLOSABLE.has(k) && !locked;
     $("panelBody").innerHTML = (x ? `<button class="btn alt pclose" style="float:right;margin:0 0 6px 10px">✕ Close</button>` : "") + html +
       (x ? `<div style="text-align:right;margin-top:10px"><button class="btn gold pclose">Done</button></div>` : "");
@@ -616,7 +618,7 @@
     $("panel").style.display = "flex"; addSignButtons($("panelBody"));
   }
   let hideWaiters = [];
-  function hidePanel() { $("panel").style.display = "none"; panelKind = null; const w = hideWaiters.splice(0); if (w.length) return w.forEach(f => f()); if (atDesk) desk(); }
+  function hidePanel() { if ($("panel").style.display !== "none") FX.sfx("close"); $("panel").style.display = "none"; panelKind = null; const w = hideWaiters.splice(0); if (w.length) return w.forEach(f => f()); if (atDesk) desk(); }
   // Open a document from inside a question and wait until the player closes it, then the question comes back.
   function openDoc(fn) { return new Promise(res => { hideWaiters.push(res); fn(); }); }
   let pre = "";
@@ -747,7 +749,8 @@
     const act = TOUCH && $("act"); if (act) { const lab = hintText.replace(/^E: /, "") || "Act"; if (act.dataset.l !== lab) { act.dataset.l = lab; act.textContent = lab.charAt(0).toUpperCase() + lab.slice(1); } }
   }
   let last = 0;
-  function tick(dt) { frame++; const modal = dlgOpen() || panelOpen(); if (TOUCH) { document.body.classList.toggle("inmodal", modal); if (modal) for (const k in keys) keys[k] = false; } if (!modal) move(dt); draw(); }
+  let stepAcc = .2;
+  function tick(dt) { frame++; const modal = dlgOpen() || panelOpen(); if (pl.moving && !modal) { stepAcc += dt; if (stepAcc > .27) { stepAcc = 0; FX.sfx("step"); } } else stepAcc = .2; if (TOUCH) { document.body.classList.toggle("inmodal", modal); if (modal) for (const k in keys) keys[k] = false; } if (!modal) move(dt); draw(); }
   function loop(t) { const dt = Math.min(.05, (t - last) / 1000 || 0); last = t; tick(dt); requestAnimationFrame(loop); }
   // A desktop shows a fixed 320x200 view in whole-pixel steps. An iPad scales in half steps and then shows as much MAP as the screen holds, so the game
   // fills the whole screen in either orientation instead of floating in a letterbox.
@@ -798,6 +801,16 @@
     if (saved && storyOn && !saved.s.over && !q.has("new")) { s = saved.s; hud(); dlg({ who: "maud", text: `Welcome back. Day ${saved.s.day}, chapter ${saved.story.ch}.`, choices: ["Continue", "Start a new game"] }).then(r => begin(r.i === 0 ? saved : null)); }
     else begin(null);
   }
+  // ---------- sound: a tap on any button, and the score follows what's happening ----------
+  document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("button"); if (b && !b.disabled && !b.closest("#pause")) FX.sfx(b.closest(".np") ? "pad" : "tap"); }, true);
+  function moodNow() { // which piece of the score fits the moment
+    if (!s) return "farm"; if (document.getElementById("night") && $("night").classList.contains("on")) return "night";
+    if (storyOn && window.Verbs && Verbs.craneOn) return "crane";
+    const wk = S.nextWeekEnd(s), due = S.weekBills(s) + S.billsDue(s, wk); if (!s.over && wk - s.day <= 2 && s.bal.cash < due) return "tense";
+    if (s.offers.some(o => o.who === "duke") || s.orders.some(o => o.who === "duke" && o.status === "open")) return (pl.x / T > 22) ? "tense" : "farm";
+    if (S.rain(s.day)) return "rain"; return pl.x / T > 22 ? "town" : "farm";
+  }
+  setInterval(() => { try { if (!window.Music || !s) return; Music.setMood(moodNow()); if (FX.sfxOn) FX.rain(S.rain(s.day) && !s.over); } catch (e) {} }, 900);
   fit(); start();
   if (q.has("auto")) { const a = q.get("auto"); G.play(q.get("bot") || "careful", /^\d+$/.test(a) ? +a : 99); if (a === "ezra") review(); }
   if (q.has("at")) { const [x, y] = q.get("at").split(",").map(Number); pl.x = x * T + 8; pl.y = y * T + 12; }
