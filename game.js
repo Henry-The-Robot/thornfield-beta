@@ -57,6 +57,7 @@
     solid.add(key(FWELL.x, FWELL.y)); props.push({ y: FWELL.y + 1, draw: () => drawWell(FWELL) });
     solid.add(key(BOARD.x, BOARD.y)); props.push({ y: BOARD.y + 1, draw: drawBoard });
     Object.values(FAIR).forEach(f => { solid.add(key(f.x - 1, f.y - 1)); solid.add(key(f.x, f.y - 1)); solid.add(key(f.x + 1, f.y - 1)); props.push({ y: f.y, draw: () => drawStall(f) }); });
+    if (window.Market) { Market.stallTiles().forEach(([x, y]) => solid.add(key(x, y))); props.push({ y: Market.STALL.y, draw: () => Market.drawStall(ctx, cam, s, frame) }); } // WS7: your own Market Day stall on the square
   })();
   const plotAt = (x, y) => s.plots.find(p => p.x === x && p.y === y);
   const npcAt = (x, y) => Object.values(NPC).find(n => n.x === x && n.y === y && npcHere(n));
@@ -71,12 +72,13 @@
   const keys = {}; const DIRS = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] };
   const KEYMAP = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
   const panelOpen = () => $("panel").style.display !== "none";
+  const marketOpen = () => !!(window.Market && Market.isOpen && Market.isOpen()); // WS7: Market Day (market.js)
   addEventListener("keydown", e => {
     // Esc: close the pause menu, or a reference panel (Ledger, notebook, transcript, plan); otherwise open the pause menu.
     // Task panels (forecast to fill, journal page, the close) aren't closed by Esc: closing them would strand the story.
     if (e.code === "Escape") { if ($("pause")) $("pause").remove(); else if (panelOpen() && panelKind && !panelKind.locked && CLOSABLE.has(panelKind.k)) hidePanel(); else pauseMenu(); e.preventDefault(); return; }
     if ($("pause")) return;
-    if (panelOpen()) return;
+    if (panelOpen() || marketOpen()) return; // WS7: the Market Day overlay owns the keyboard while it is up
     if (dlgOpen()) { if (e.target.tagName === "INPUT") { if (e.key === "Enter") $("dlg").querySelector(".ch button").click(); return; }
       const n = +e.key; if (n >= 1 && n <= 9) { const b = $("dlg").querySelectorAll("button")[n - 1]; if (b && !b.disabled) b.click(); } e.preventDefault(); return; }
     if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; pl.target = null; e.preventDefault(); }
@@ -119,6 +121,7 @@
     if (s.over) return closeBooks();
     if (storyOn && Story.busy) return;
     const n = npcAt(x, y); if (n) { n.dir = ({ up: "down", down: "up", left: "right", right: "left" })[pl.dir]; return talk(n.who); }
+    if (window.Market && Market.stallAt(x, y)) return Market.open(); // WS7: Market Day
     if (x === CRATE.x && y === CRATE.y) return crate();
     const b = buildingAt(x, y); if (b) return b.id === "house" ? desk() : talk(b.who);
     const p = plotAt(x, y);
@@ -567,6 +570,7 @@
     $("bar").innerHTML = `<div class="slot"><i>sacks</i><canvas width=16 height=16 data-i="sack"></canvas><b>${s.sacks}</b></div><div class="slot"><i>seed</i><canvas width=16 height=16 data-i="seed"></canvas><b>${s.seeds}</b></div>` +
       `<div class="slot"><i>sprinkler</i><canvas width=16 height=16 data-i="sprinkler"></canvas><b>${s.sprinklersHeld}</b></div><div class="slot keys"><button class="btn alt" style="font-size:11px;padding:2px 6px" onclick="G.notebook()">Notebook</button> <button class="btn alt" style="font-size:11px;padding:2px 6px" onclick="G.transcript()">Transcript</button><br>Desk at home: ledger, forecast</div>`;
     $("bar").querySelectorAll("canvas").forEach(c => c.getContext("2d").drawImage(c.dataset.i === "seed" ? A.crops[1] : A[c.dataset.i], 0, 0));
+    paintGoal();
   }
   // The top bar is built once: [Day, Cash, Crown meter] [goal] [Travel] [Books], then the Books strip underneath.
   let booksPin = false, curSpot = [];
@@ -594,7 +598,13 @@
     const segs = [["Cash", b.cash, "#2f6f62"], ["Inventory", b.inv, "#b8862b"], ["Accounts receivable", b.ar, "#5b7fc4"]], tot = Math.max(1, segs.reduce((a, x) => a + Math.max(0, x[1]), 0));
     return `<span class="k">Where your coin is</span><div class="coinmap">${segs.map(([n, v, c]) => `<div style="width:${Math.max(0, v) / tot * 100}%;background:${c}" title="${n}: ${v}">${v / tot > .18 ? `${n} ${v}` : ""}</div>`).join("")}</div>`;
   }
-  function goal(text, ch) { $("goal").innerHTML = text ? `<span class="k">Chapter ${ch} of 9</span> ${text.replace(/^Chapter \d+ · /, "")}` : ""; $("goal").style.display = text ? "block" : "none"; }
+  // WS7: on a Market Day the ribbon gains a second line with a "To the stall" button (market.js builds it); paintGoal() re-runs from hud() so it appears and goes with the day
+  let goalNow = { text: "", ch: 0 };
+  function goal(text, ch) { goalNow = { text, ch }; paintGoal(); }
+  function paintGoal() {
+    const m = window.Market && s ? Market.goalLine(s, storyOn && Story.busy) : "", html = (goalNow.text ? `<span class="k">Chapter ${goalNow.ch} of 9</span> ${goalNow.text.replace(/^Chapter \d+ · /, "")}` : "") + m, g = $("goal");
+    if (g.dataset.h !== html) { g.dataset.h = html; g.innerHTML = html; } g.style.display = html ? "block" : "none";
+  }
   function floatHud(id, v) { const el = $("h-" + id); if (!el) return; const r = el.getBoundingClientRect(), w = $("wrap").getBoundingClientRect();
     flo(`${v > 0 ? "+" : "−"}${Math.abs(v)}`, r.left - w.left + 10, r.bottom - w.top + 4, v > 0 ? "#2f6f3a" : "#9b2335"); }
   function floatAt(tx, ty, text, col) { if (!text) return; const sc = cv.getBoundingClientRect().width / VW; flo(text, (tx * T - cam.x) * sc, (ty * T - cam.y) * sc, col); }
@@ -741,13 +751,13 @@
     if (window.Verbs) Verbs.draw(ctx, cam, frame); // WS3: frames round tagged things
     const f = facing(), p = plotAt(f.x, f.y), n = npcAt(f.x, f.y), b = buildingAt(f.x, f.y);
     if (p) { ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 1; ctx.strokeRect(f.x * T - cam.x + .5, f.y * T - cam.y + .5, 15, 15); }
-    const hintText = dlgOpen() ? "" : n ? `E: talk to ${S.NAMES[n.who]}` : (f.x === CRATE.x && f.y === CRATE.y) ? "E: shipping crate" : (f.x === BOARD.x && f.y === BOARD.y) ? "E: notice board" : b ? (b.id === "house" ? "E: sit at your desk" : `E: ${S.NAMES[b.who]}`) :
+    const hintText = dlgOpen() ? "" : n ? `E: talk to ${S.NAMES[n.who]}` : (window.Market && Market.stallAt(f.x, f.y)) ? "E: your Market Day stall" : (f.x === CRATE.x && f.y === CRATE.y) ? "E: shipping crate" : (f.x === BOARD.x && f.y === BOARD.y) ? "E: notice board" : b ? (b.id === "house" ? "E: sit at your desk" : `E: ${S.NAMES[b.who]}`) :
       p ? "E: " + (!p.tilled ? "till" : p.sprinkler ? "pick up sprinkler" : !p.crop ? (s.sprinklersHeld ? "place sprinkler" : s.seeds ? "plant seed" : "no seed: buy from Tomas") : S.stage(s, p) === 4 ? "harvest" : p.watered || S.rain(s.day) ? "watered" : "water") : "";
     $("hint").textContent = TOUCH ? "" : hintText; // the "E: ..." hint is for a keyboard; on an iPad you just tap
     const act = TOUCH && $("act"); if (act) { const lab = hintText.replace(/^E: /, "") || "Act"; if (act.dataset.l !== lab) { act.dataset.l = lab; act.textContent = lab.charAt(0).toUpperCase() + lab.slice(1); } }
   }
   let last = 0;
-  function tick(dt) { frame++; const modal = dlgOpen() || panelOpen(); if (TOUCH) { document.body.classList.toggle("inmodal", modal); if (modal) for (const k in keys) keys[k] = false; } if (!modal) move(dt); draw(); }
+  function tick(dt) { frame++; const modal = dlgOpen() || panelOpen() || marketOpen(); if (TOUCH) { document.body.classList.toggle("inmodal", modal); if (modal) for (const k in keys) keys[k] = false; } if (!modal) move(dt); draw(); }
   function loop(t) { const dt = Math.min(.05, (t - last) / 1000 || 0); last = t; tick(dt); requestAnimationFrame(loop); }
   // A desktop shows a fixed 320x200 view in whole-pixel steps. An iPad scales in half steps and then shows as much MAP as the screen holds, so the game
   // fills the whole screen in either orientation instead of floating in a letterbox.
@@ -798,6 +808,7 @@
     if (saved && storyOn && !saved.s.over && !q.has("new")) { s = saved.s; hud(); dlg({ who: "maud", text: `Welcome back. Day ${saved.s.day}, chapter ${saved.story.ch}.`, choices: ["Continue", "Start a new game"] }).then(r => begin(r.i === 0 ? saved : null)); }
     else begin(null);
   }
+  if (window.Market) Market.init(G); // WS7
   fit(); start();
   if (q.has("auto")) { const a = q.get("auto"); G.play(q.get("bot") || "careful", /^\d+$/.test(a) ? +a : 99); if (a === "ezra") review(); }
   if (q.has("at")) { const [x, y] = q.get("at").split(",").map(Number); pl.x = x * T + 8; pl.y = y * T + 12; }

@@ -429,7 +429,7 @@
     return null;
   }
 
-  root.Spring = { R, marketPrice, spotPrice, traderPrice, ACCTS, NAMES, OFFERS, newGame, post, balanceSheet, terms, rain, stage, sprinkled, committed, sacksComing, openOrders,
+  root.Spring = { R, roll, marketPrice, spotPrice, traderPrice, ACCTS, NAMES, OFFERS, newGame, post, balanceSheet, terms, rain, stage, sprinkled, committed, sacksComing, openOrders,
     weekBills, billsDue, nextWeekEnd, forecast, discNow, addOffer, setPrice, factor, act, accept, decline, deliver, sellSpot, buySeeds, payBills, buySprinkler, wager, wagerWin, sprinklerFacts, buyFence, crownFund, preview, notice, answerNotice, marketOutlook, rescue, refusePell, buyPoison, ratLoss, warning, borrow, repay, loanFacts, sleep, coach };
   if (typeof module !== "undefined") module.exports = root.Spring;
 })(typeof window !== "undefined" ? window : globalThis);
