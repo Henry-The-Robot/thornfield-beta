@@ -274,7 +274,7 @@
   }
   // Stall detector: the story is waiting but nothing is on screen for 4 s -> point the player to the menu.
   setInterval(() => {
-    const idle = storyOn && Story.busy && !dlgOpen() && !panelOpen() && !$("pause");
+    const idle = storyOn && Story.busy && !dlgOpen() && !panelOpen() && !$("pause") && !document.querySelector(".s6ov, .wkcard, #court"); // the ending card, the week card and the Court are screens too
     stall.t = idle ? (stall.t || 0) + 1 : 0; if (stall.t === 4) toast("Something seems stuck. Open the menu (☰, top right) to restart the day.");
   }, 1000);
   const stall = {};
@@ -731,7 +731,7 @@
     else ez.innerHTML = mw + `<p>Before summer, Ezra reads your books. Explain them well and he lends more, cheaper.</p><button class="btn gold" id="goEzra">Take the books to Ezra</button>`;
     ez.insertAdjacentHTML("beforeend", endBtn());
     wire(); save();
-    // WS6 finale slot: if the Ledger Duel (court.js, another builder) is loaded it runs now; otherwise the close + verdict above stand, with "The Audit (coming)"
+    // WS6 finale slot: if the Ledger Duel (court.js, another builder) is loaded it runs now; otherwise the close + verdict above stand
     if (storyOn && window.Court && Court.run && s.outcome !== "insolvent") await Court.run({ G: window.G, s, Story, Endings, st: closing.st, verdict: S.crownFund(s).verdict, ending: Endings.ending(s) });
   }
   function reveal(k, text) { return new Promise(res => { (k === "bs" ? ["bs0", "bs1"] : [k]).forEach(x => $("sec-" + x) && $("sec-" + x).classList.remove("veil"));
@@ -741,8 +741,8 @@
     rows.forEach(r => { if (!r.dataset.line) return; r.classList.add("pick"); r.onclick = () => {
       if (r.dataset.line === target) { rows.forEach(x => { x.onclick = null; x.classList.remove("pick"); }); window.__pick = undefined; res(tries); } // resolves with the number of wrong taps first
       else { tries++; $("mline").innerHTML = `<b>Maud:</b> ${text}<br><i class="hintline">Not that one. ${hints[Math.min(tries - 1, hints.length - 1)]}</i>`; } }; }); }); }
-  // WS6: the ending (Sold out / Seized / Bridged / Free) after the books close; "The Audit (coming)" stands in for the WS8 finale
-  const endBtn = () => storyOn ? `${window.Court ? "" : `<p class="hint">The Audit (coming): Corvin Vane before the magistrate.</p>`}<p><button class="btn alt" id="goEnd">How it ends</button></p>` : "";
+  // WS6: the ending (Sold out / Seized / Bridged / Free) after the books close
+  const endBtn = () => storyOn ? `<p><button class="btn alt" id="goEnd">How it ends</button></p>` : "";
   function wire() { const a = $("again"), g = $("goEzra"), e = $("goEnd"); if (a) a.onclick = restart; if (g) g.onclick = review; if (e) e.onclick = () => Story.showEnding(Endings.ending(s)); }
   function review() {
     const qs = B.review(closing.st), before = S.terms(s); let i = 0, right = 0; const ez = $("ez");

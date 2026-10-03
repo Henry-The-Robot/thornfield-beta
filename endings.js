@@ -1,41 +1,39 @@
 // Spring at Thornfield — WS6: Crane's standing offer (M3), the four endings, their epilogues and what each one unlocks.
-// Pure JS, no DOM: runs in the browser (window.Endings) and under node (tests/test-offer.js). Resolves Spring/Bot lazily.
+// Pure JS, no DOM: runs in the browser (window.Endings) and under node (tests/test-offer.js). Resolves Spring lazily.
 // Design: SEASON-1-REDESIGN.md §2 (endings) and §3 M3. The offer is a Reigns-style binary choice with a ticking price
 // (Reigns, Nerial 2016); each ending unlocks a journal page or letter that a later game can read, the Hades pattern
 // (a loss still progresses something).
 //
 // THE OFFER PRICE (documented, tested in tests/test-offer.js):
-//   price = max(150, round( max(0, equity) + 300 - 10 * daysInGap ))
-//   equity    = Owner's equity on the balance sheet today (negative for most of the season, so it adds 0 until you prosper)
+//   price = max(150, round( 300 + max(0, opCash) / 2 - 10 * daysInGap ))
+//   opCash    = Cash the farm's operations have cleared this spring so far (every Cash line except the opening chest, equipment, and loans in and out)
 //   daysInGap = how many of the next 14 days the cash forecast shows Cash below zero (the "cash gap before Midwinter")
-//   -> a healthy farm is offered 300 (rising a little with equity); a farm that is about to run dry is offered less, down to the 150 floor.
+//   -> the price RISES with what the farm actually earns in Cash (the more it clears, the more Vane has to offer) and FALLS with desperation (every day the chest is forecast
+//      empty costs 10), never below the 150 floor. It deliberately does not use book equity: equity is what the books say, not what the farm can earn.
 //   MERCY: when Cash is below the coming pay-day (wages + interest), Crane comes back with a lower "mercy" offer:
 //   mercy = max(100, round(price * 0.6)). He is bargaining from your weakness.
-// THE SOLD-OUT EPILOGUE compares what you took with what the books say the farm would have been worth on day 28
-// if played carefully: it runs the careful bot (bot.js) from today's state on a deep copy and reads the Crown fund
-// (Spring.crownFund: Cash + receivables + inventory - payables - loan - deposits). Tag: C0.01 time value, C1.01 equity.
+// THE SOLD-OUT EPILOGUE does not claim the offer was too low. It sets the offer beside what the farm EARNS (the Cash it cleared this spring, or its profit while that is still in grain and invoices) and beside book equity, because
+// a business is worth the Cash it will keep earning, and the land (the millstream Vane wants) is not on the books at all. Tag: C0.01 time value, C1.01 equity.
 (function (root) {
-  const SP = () => root.Spring || require("./engine.js"), BT = () => root.Bot || require("./bot.js");
+  const SP = () => root.Spring || require("./engine.js");
   const MIN_PRICE = 150, MERCY_FLOOR = 100, MERCY_SHARE = 0.6;
 
   function daysInGap(s) { // days in the next 14 where Cash is forecast below zero, doing nothing else
     const rows = SP().forecast(s, 14); return rows.filter(r => r.close < 0).length;
   }
+  // Cash cleared by operations so far: every Cash line outside the opening chest, equipment, and loans in and out (the same split the cash-flow statement uses)
+  const opCash = s => s.journal.filter(j => ["open", "equip", "borrow", "repay"].indexOf(j.type) < 0).reduce((a, j) => a + (j.lines.cash || 0), 0);
   function offer(s) {
-    const S = SP(), b = S.balanceSheet(s.bal), gap = daysInGap(s), eq = Math.max(0, b.equity);
-    const base = Math.max(MIN_PRICE, Math.round(eq + 300 - 10 * gap));
+    const S = SP(), b = S.balanceSheet(s.bal), gap = daysInGap(s), earned = opCash(s);
+    const base = Math.max(MIN_PRICE, Math.round(300 + Math.max(0, earned) / 2 - 10 * gap));
     const mercy = s.bal.cash < S.weekBills(s), price = mercy ? Math.max(MERCY_FLOOR, Math.round(base * MERCY_SHARE)) : base;
-    return { price, base, mercy, daysInGap: gap, equity: b.equity, cash: s.bal.cash, wages: S.weekBills(s) };
+    return { price, base, mercy, daysInGap: gap, equity: b.equity, earned, cash: s.bal.cash, wages: S.weekBills(s) };
   }
-  // What the books say the farm is worth on day 28 if the rest of the season is played carefully, from this state.
-  function carefulFrom(s) {
-    const S = SP(), c = JSON.parse(JSON.stringify(s)); c.quiet = false; c.story = false; c.over = false; c.outcome = null; let n = 0;
-    try { while (!c.over && n++ < 40) { BT().careful.day(c); S.sleep(c); } } catch (e) { return null; }
-    const f = S.crownFund(c); return { net: f.net, gap: f.gap, verdict: c.outcome === "insolvent" ? "insolvent" : f.verdict, crown: f.crown, cash: c.bal.cash };
-  }
+  // What the farm EARNS, honestly: Cash cleared by operations when that is positive; otherwise this spring's profit (Net income), which for most of a season is still sitting
+  // in grain and invoices (a careful season's operating Cash is often below zero until the Duke pays). basis says which one the line is about.
   function soldOut(s, price) {
-    const careful = carefulFrom(s), R = SP().R;
-    return { price, careful, worth: careful ? careful.net : null, crown: R.crownDebt, day: s.day, tags: ["C0.01", "C1.01"] };
+    const S = SP(), b = S.balanceSheet(s.bal), cash = opCash(s), profit = b.ni, basis = cash > 0 ? "cash" : profit > 0 ? "profit" : "none", amount = basis === "cash" ? cash : basis === "profit" ? profit : 0;
+    return { price, earned: amount, basis, cash, profit, equity: b.equity, springs: amount > 0 ? Math.round(price / amount * 10) / 10 : null, day: s.day, tags: ["C0.01", "C1.01"] };
   }
   // Which ending a finished game earns: sold (took Crane's offer), seized (insolvent, or the Crown takes it), bridged (Ezra carries you), free (the Crown is paid).
   function ending(s) {
@@ -50,8 +48,10 @@
       sold: () => { const so = ctx.sold || soldOut(s, offer(s).price);
         return { title: "Sold out", lines: [
           `Crane counts ${n(so.price)} onto the table and stamps the deed. ${farm} is the Duke's by supper.`,
-          so.worth != null ? `Run carefully, the books say ${farm} would have held ${n(so.worth)} on day 28 against the Crown's ${n(so.crown)}${so.careful.gap >= 0 ? ", with " + n(so.careful.gap) + " to spare" : ", " + n(so.careful.gap) + " short"}.` : `Run carefully, ${farm} might have paid the Crown's ${n(so.crown)}.`,
-          `You took ${n(so.price)} today. Money now against the farm later: the offer was always lower than the farm.`,
+          so.basis === "cash" ? `The books list ${farm}'s equity at ${so.equity < 0 ? "-" : ""}${n(so.equity)}, but the farm cleared ${n(so.earned)} in Cash this spring alone. A farm that earns that is worth what it keeps earning, and the land isn't on the books at all.`
+            : so.basis === "profit" ? `The books list ${farm}'s equity at ${so.equity < 0 ? "-" : ""}${n(so.equity)}, but the farm earned ${n(so.earned)} this spring, most of it still in grain and invoices. A farm that earns that is worth what it keeps earning, and the land isn't on the books at all.`
+            : `The books list ${farm}'s equity at ${so.equity < 0 ? "-" : ""}${n(so.equity)}, and the farm had not yet earned a profit. But a farm is worth what it will go on earning, and the land (the millstream Vane wants) isn't on the books at all.`,
+          so.springs != null ? `You took ${n(so.price)}: about ${so.springs} springs of this spring's ${so.basis === "cash" ? "Cash" : "profit"}, paid today. Whether that was fair depends on what the farm earns next, not on the books.` : `You took ${n(so.price)} today. Whether that was fair depends on what the farm earns next, not on the books.`,
           `Corvin Vane watches from the gate. A farm sold on day ${s.day} is a farm he did not have to wait for.`] }; },
       seized: () => ({ title: "Seized", lines: [
           s.outcome === "insolvent" ? `Day ${s.day}: ${s.why || "the chest ran dry"}` : `On day 28 ${farm} is ${n(f.gap)} short of the Crown's ${n(R.crownDebt)}.`,
@@ -64,7 +64,7 @@
       free: () => ({ title: "Free", lines: [
           `The Crown is paid: ${n(f.net)} against ${n(R.crownDebt)}${f.gap > 0 ? ", with " + n(f.gap) + " to spare" : ""}. ${farm} is yours.`,
           `You watched the chest, not the Ledger. Edric's last page was right.`,
-          `Corvin Vane will answer for the Duke's order before the magistrate: The Audit (coming).`,
+          `Corvin Vane's second seal is on the table. He will answer for the Duke's order.`,
           `"Summer is long, heir," says Corvin. "Your busiest month is coming."`] }),
     };
     const e = T[kind](); e.kind = kind; e.unlock = UNLOCKS[kind]; return e;
@@ -81,6 +81,6 @@
     set: d => { try { if (root.localStorage) root.localStorage.setItem(KEY, JSON.stringify(d)); else mem = d; } catch (e) { mem = d; } } };
   function unlock(kind) { const u = UNLOCKS[kind]; if (!u) return null; const d = store.get(); const fresh = !d[u.id]; d[u.id] = { kind: u.kind, term: u.term, text: u.text, ending: kind }; store.set(d); return { u, fresh }; }
   const unlocked = () => Object.entries(store.get()).map(([id, v]) => Object.assign({ id }, v));
-  root.Endings = { MIN_PRICE, offer, daysInGap, soldOut, carefulFrom, ending, epilogue, unlock, unlocked, UNLOCKS };
+  root.Endings = { MIN_PRICE, offer, opCash, daysInGap, soldOut, ending, epilogue, unlock, unlocked, UNLOCKS };
   if (typeof module !== "undefined") module.exports = root.Endings;
 })(typeof window !== "undefined" ? window : globalThis);

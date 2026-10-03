@@ -1,5 +1,15 @@
 # Changelog
 
+## T3b: story critic fixes
+- Sold-out epilogue no longer compares the offer with a bot's "careful" run or claims it was too low. It sets the price beside what the farm EARNS (Cash cleared this spring, or profit while that is still in grain and invoices) and beside book equity, and says the land isn't on the books.
+- Crane's offer now rises with the Cash the farm's operations have cleared and falls with the days the forecast shows the chest empty (documented in endings.js, tested both ways); book equity no longer moves it.
+- The Tomas-vs-Ezra verdict uses the discount the engine books and whole coins, one number per sentence.
+- Every Maud box is at most two sentences; every Crane line is in "Item:" sentences (story, scenes, cast).
+- Wording: "You must be the heir"; the second order says "delighted with the first" only if you took it; Edric's page says "the same kind of order".
+- The ending card, week card and Court count as screens for the stall detector; the Sold ending has a Close button; `?ending=` previews a copy and writes no unlock.
+- Edric's cash book: one row per day, profit / Cash cleared / tied up in grain and unpaid invoices (Inventory + Receivables - Payables - Deposits).
+- No "(coming)" text; the day-28 goal mentions the Reeve's Court. Tests: `test-t3b.js`, `test-offer.js` updated.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]

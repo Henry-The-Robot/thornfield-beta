@@ -25,11 +25,11 @@ window.Scenes = (function () {
       } },
     { id: "crane_offduty", who: "crane", from: 13, to: 17, at: [32, 10], card: ["A second seal on the writ", "small, scratched, under the Crown's"], hint: "Crane is standing by the well without his ledger.",
       async run(c) {
-        await c.lines("crane", ["Heir. I am off duty. I have left my ledger at home. I feel exposed.", "I am not here to collect. I am here to say something I am not employed to say.", "Item: the writ you carry. I have read it eleven times. Item: it is longer than it should be. Item: a debt of this kind does not usually come with a second seal."]);
+        await c.lines("crane", ["Item: off duty. Item: my ledger is at home. Item: I feel exposed.", "Item: I am not here to collect. Item: I am here to say something I am not employed to say.", "Item: the writ you carry; I have read it eleven times. Item: it is longer than it should be. Item: a debt of this kind does not usually come with a second seal."]);
         const k = await c.ask("crane", "He waits, pen-less, which seems to hurt him.", ["A second seal?", "Why tell me?"]);
-        if (k === 0) await c.lines("crane", ["Small. Under the Crown's. Scratched, as if someone wished it were not there.", "I cannot read it. I am a bailiff, not a... there is a word. I do not have it. I dislike that."]);
-        else await c.lines("crane", ["Because I was a clerk in the Duke's counting-house once. Because two columns did not agree. Because no one asked, until you.", "Do not make me regret my sentences."]);
-        await c.lines("crane", ["Keep your sacks counted, heir. I shall go back to being unpleasant."]);
+        if (k === 0) await c.lines("crane", ["Item: small, under the Crown's, scratched as if someone wished it were not there.", "Item: I cannot read it. Item: there is a word for what I am not, and I do not have it. Item: I dislike that."]);
+        else await c.lines("crane", ["Item: I was a clerk in the Duke's counting-house once. Item: two columns did not agree. Item: no one asked, until you.", "Item: do not make me regret my sentences."]);
+        await c.lines("crane", ["Item: keep your sacks counted, heir. Item: I shall go back to being unpleasant."]);
         c.flag("craneSeal", true); c.clue(); c.trust("crane", 2);
       } },
     { id: "tomas_contracts", who: "tomas", from: 13, card: ["A grey cloak buys seed contracts", "offered triple"], hint: "Tomas is whispering. Tomas never whispers.",
@@ -45,7 +45,7 @@ window.Scenes = (function () {
         const inv = c.s.invoices.find(v => v.who === "hobb"), amt = inv.amount;
         await c.lines("hobb", ["I... have a thing to ask. I'd rather be hit with the wheel.", "The road washed out. Three weeks of flour stuck on the wrong side of a river. My customers can't pay me. So I can't pay you.", `I'm asking for seven more days on the ${amt} I owe you. I'll pay... eventually. I always have.`]);
         const k = await c.ask("hobb", "He has taken his hat off, which he does for funerals.", ["Of course. Seven more days.", "I can't afford to wait. The day it's due.", `Half now, half in a week (${Math.floor(amt / 2)} today).`]);
-        if (k === 0) { inv.due += 7; c.flag("hobbExt", "gave"); c.trust("hobb", 2); await c.lines("hobb", ["...Thank you. You'll... not regret it. Probably."]); await c.maud("You just lent Hobb money. Not coin: time. A receivable is a loan you didn't price. What did you charge him for the week?"); }
+        if (k === 0) { inv.due += 7; c.flag("hobbExt", "gave"); c.trust("hobb", 2); await c.lines("hobb", ["...Thank you. You'll... not regret it. Probably."]); await c.maud("You just lent Hobb money: not coin, but time. A receivable is a loan you didn't price, so what did you charge him for the week?"); }
         else if (k === 1) { c.flag("hobbExt", "refused"); c.trust("hobb", -1); await c.lines("hobb", ["...Fair. A man pays what he owes. I'll find it."]); }
         else { const half = Math.floor(amt / 2); c.S.post(c.s, "collect", "Hobb paid half of his invoice early, asked for time on the rest", { cash: half, ar: -half }); inv.amount -= half; inv.due += 7; c.flag("hobbExt", "half"); c.trust("hobb", 1); await c.lines("hobb", ["Half... today. Half in a week. That's... better than I asked for. You're your uncle's heir and also not."]); }
       } },
@@ -87,10 +87,10 @@ window.Scenes = (function () {
       } },
     { id: "crane_seal", who: "crane", from: 23, at: [32, 10], card: ["The second seal is Vane's mark", "a note-buyer's mark: the Crown sold your debt"], need: s => s.flags && s.flags.craneSeal, hint: "Crane is by the well again. He has a paper.",
       async run(c) {
-        await c.lines("crane", ["Item: I have a copy of the writ. Item: it is a copy I should not have made. Item: I made it.", "The second seal. I looked it up. A man in the counting-house taught me, once, to read the small ones. It is a note-buyer's mark. It means the Crown sold your debt, heir. To someone."]);
+        await c.lines("crane", ["Item: I have a copy of the writ. Item: it is a copy I should not have made. Item: I made it.", "Item: the second seal. Item: a man in the counting-house once taught me to read the small ones. Item: it is a note-buyer's mark, and it means the Crown sold your debt, heir, to someone."]);
         const k = await c.ask("crane", "He holds the paper at arm's length, as if it might go off.", ["To whom?", "Can they do that?"]);
-        if (k === 0) await c.lines("crane", ["The mark is Corvin Vane's. It is a small mark. Vane has never been a man for large ones."]);
-        else await c.lines("crane", ["They can. A debt is a thing, like a sack. It can be bought and sold and called in. That is not the part I find unpleasant. The unpleasant part is the discount."]);
+        if (k === 0) await c.lines("crane", ["Item: the mark is Corvin Vane's. Item: it is a small mark; Vane has never been a man for large ones."]);
+        else await c.lines("crane", ["Item: they can. Item: a debt is a thing, like a sack, to be bought, sold and called in. Item: the part I find unpleasant is the discount."]);
         c.flag("craneVane", true); c.clue(); c.trust("crane", 2);
       } },
     { id: "vane_offer", who: "duke", from: 24, at: [36, 10], card: ["Vane's “partnership”", "a mortgage payable on demand"], hint: "The Steward is in the square. He has brought a pen.",
@@ -98,7 +98,7 @@ window.Scenes = (function () {
         await c.lines("duke", ["Heir. I'm told you've done the impossible: you've made a profit and kept the Cash. I'm delighted. Truly.", "I come with an offer. Nothing grand. I hold your note now, the Crown found it tedious. I should like to forgive it.", "All of it. The writ. Gone. In exchange for the millstream rights at the east boundary and a modest mortgage over the farm. A formality. We'd be partners."]);
         const k = await c.ask("duke", "He has uncapped the pen. He is a very patient man.", ["No.", "Tell me more.", "I'll think about it."]);
         if (k === 0) { await c.lines("duke", ["No. How decisive. Edric said no to me once. Very kindly. It ended much the same.", "The offer stands until Midwinter. Offers do. It is people who expire."]); c.flag("vane", "refused"); }
-        else if (k === 1) { await c.lines("duke", ["The mortgage would be over the whole farm, you understand. Payable on demand.", "Demand being, of course, mine. A technicality. Partners trust one another."]); c.flag("vane", "asked"); await c.maud("'Payable on demand.' Read that twice. A loan he can call in whenever he chooses is not a partnership. It is a leash with a handshake."); }
+        else if (k === 1) { await c.lines("duke", ["The mortgage would be over the whole farm, you understand. Payable on demand.", "Demand being, of course, mine. A technicality. Partners trust one another."]); c.flag("vane", "asked"); await c.maud("'Payable on demand.' Read that twice: a loan he can call in whenever he chooses is not a partnership, it is a leash with a handshake."); }
         else { await c.lines("duke", ["Take the winter. I shall be... around."]); c.flag("vane", "waiting"); }
         c.clue();
       } },
