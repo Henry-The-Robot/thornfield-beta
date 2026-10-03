@@ -252,6 +252,7 @@
       <p><button class="btn gold" id="pz-resume" style="width:100%">Resume</button></p>
       <p><button class="btn alt" id="pz-restart" style="width:100%">Restart today (from this morning's save)</button></p>
       <p><button class="btn alt" id="pz-map" style="width:100%">Save and quit</button></p>
+      <p><button class="btn alt" id="pz-intro" style="width:100%">Watch the opening</button></p>
       <p><button class="btn alt" id="pz-music" style="width:100%"></button></p>
       <p><button class="btn alt" id="pz-sound" style="width:100%"></button></p>
       <p><button class="btn alt" id="pz-feedback" style="width:100%">Copy feedback details</button></p>
@@ -260,6 +261,7 @@
     document.body.appendChild(p);
     p.onclick = e => { if (e.target === p) p.remove(); };
     $("pz-resume").onclick = () => p.remove();
+    if ($("pz-intro")) $("pz-intro").onclick = () => { p.remove(); if (window.Intro) Intro.play().then(() => { try { Music.setMood(moodNow()); } catch (e) {} }); };
     $("pz-restart").onclick = () => location.reload();
     $("pz-map").onclick = () => { save(); location.href = "index.html"; };
     $("pz-feedback").onclick = () => copyFeedback();
@@ -857,7 +859,9 @@
       else s = S.newGame({ story: storyOn, bonus: Math.min(100, (window.Codex ? Codex.prestige() : 0) * 10), seed: q.has("seed") ? +q.get("seed") : storyOn ? 1 + Math.floor(Math.random() * 2147483646) : 0 });
       if (window.Verbs) Verbs.init(G);
       if (storyOn) Story.init(G, sv && sv.story); else goal("");
-      hud(); if (storyOn) Story.start();
+      // a brand-new story game opens with the animated prologue (intro.js); Continue, sandbox and test runs go straight in
+      const go = () => { hud(); if (storyOn) Story.start(); };
+      if (!sv && storyOn && window.Intro && Intro.wanted(q)) Intro.play().then(go); else go();
     };
     if (saved && storyOn && !saved.s.over && !q.has("new")) { s = saved.s; hud(); dlg({ who: "maud", text: `Welcome back. Day ${saved.s.day}, chapter ${saved.story.ch}.`, choices: ["Continue", "Start a new game"] }).then(r => begin(r.i === 0 ? saved : null)); }
     else begin(null);
@@ -871,7 +875,7 @@
     if (s.offers.some(o => o.who === "duke") || s.orders.some(o => o.who === "duke" && o.status === "open")) return (pl.x / T > 22) ? "tense" : "farm";
     if (S.rain(s.day)) return "rain"; return pl.x / T > 22 ? "town" : "farm";
   }
-  setInterval(() => { try { if (!window.Music || !s) return; Music.setMood(moodNow()); if (FX.sfxOn) FX.rain(S.rain(s.day) && !s.over); } catch (e) {} }, 900);
+  setInterval(() => { try { if (!window.Music || !s || (window.Intro && Intro.active)) return; Music.setMood(moodNow()); if (FX.sfxOn) FX.rain(S.rain(s.day) && !s.over); } catch (e) {} }, 900);
   if (window.Market) Market.init(G); // WS7
   fit(); start();
   if (q.has("auto")) { const a = q.get("auto"); G.play(q.get("bot") || "careful", /^\d+$/.test(a) ? +a : 99); if (a === "ezra") review(); }

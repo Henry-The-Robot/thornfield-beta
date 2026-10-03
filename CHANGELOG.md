@@ -1,5 +1,11 @@
 # Changelog
 
+## The opening
+- A 74-second animated prologue (`intro.js`, `intro.css`) opens every new story game: the valley at dusk, Edric's ledger rising while his chest empties, Crane and the Crown's writ with its scratched second seal, the man in the grey cloak buying the valley's paper, you arriving at dawn, then the title. Drawn with the game's own sprites, scored with its own music moods, with sound effects cued to the picture.
+- Every spoken line is a subtitle and is also data (`Intro.SCRIPT`, `node tools/intro-script.js`): `Intro.setVoice("assets/voice/intro")` plays `<id>.mp3` per line when a voice is added. See `docs/INTRO-SCRIPT.md`.
+- Skip (button or Escape) at any time; "Watch the opening" in the pause menu replays it; `?intro=0` / `?intro=1`.
+- Tests: `test-intro.js`, `intro.html` (real-time runner).
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]

@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><title>The opening</title></head><body><pre id="out">running</pre>
+<!-- The animated opening through the real game: it opens a new story game, shows every line as a subtitle in order, fires its sound cues and the score's moods, can be skipped (button, Escape),
+     plays a voice file per line when a voice is set, draws a different picture in every shot, and hands over to the first scene. Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=60000 --dump-dom tests/intro.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+const load = q => new Promise(r => { const f = document.createElement("iframe"); f.style.cssText = "width:1194px;height:834px;border:0"; f.src = "../game.html" + q; document.body.appendChild(f); f.onload = () => r(f); });
+(async () => { try {
+  // 1. a plain new story game (no params, fresh profile) opens with the gate
+  let f = await load("?savetest=1"), w = f.contentWindow, d = w.document, errs = []; w.addEventListener("error", e => errs.push(e.message)); await sleep(400); w.localStorage.removeItem("lc_spring_save_v3");
+  out.push(`a first visit opens with the opening: ${!!d.getElementById("intro")} (gate: ${!!d.getElementById("in-gate")}; the game's first scene waits: ${!d.getElementById("dlg") || d.getElementById("dlg").style.display !== "flex"})`);
+  out.push(`Skip is at least 44px: ${d.getElementById("in-skip").getBoundingClientRect().height >= 44 && d.getElementById("in-skip").getBoundingClientRect().width >= 44}; Begin: ${d.getElementById("in-go").getBoundingClientRect().height >= 44}`);
+  // spies: sound effects, the score, the voice
+  const sfx = [], moods = [], auds = []; const FX = w.FX, Mu = w.Music, oS = FX.sfx, oM = Mu.setMood; FX.sfx = n => { sfx.push(n); try { oS.call(FX, n); } catch (e) {} }; Mu.setMood = m => { moods.push(m); try { oM.call(Mu, m); } catch (e) {} };
+  w.Audio = function (src) { auds.push(src); return { play() { return Promise.resolve(); }, pause() {}, set volume(v) {} }; }; w.Intro.setVoice("assets/voice/intro");
+  // play it at 30x (2.5 s of virtual time)
+  w.Intro.end("skipped"); await sleep(450); const pr = w.Intro.play({ speed: 30, autostart: true }); await sleep(100);
+  out.push(`the opening starts: ${w.Intro.active}, the canvas is on screen: ${!!d.getElementById("in-cv")}`);
+  // sample a frame inside each shot: they must all draw something, and differ from each other
+  const sig = []; for (let i = 0; i < w.Intro.SHOTS.length; i++) { w.Intro.debug.seek(w.Intro.STARTS[i] + 3); await sleep(30); const cv = d.getElementById("in-cv"), px = cv.getContext("2d").getImageData(0, 0, 320, 180).data; let h = 0, lit = 0; for (let k = 0; k < px.length; k += 4 * 97) { h = (h * 31 + px[k] + px[k + 1] * 7 + px[k + 2] * 13) >>> 0; if (px[k] + px[k + 1] + px[k + 2] > 60) lit++; } sig.push(h + ":" + lit); }
+  out.push(`six shots, six different pictures, none blank: ${new Set(sig.map(s => s.split(":")[0])).size === 6 && sig.every(s => +s.split(":")[1] > 30)}`);
+  w.Intro.debug.release(); { const s0 = w.Intro.debug.st; s0.t = 0; s0.said.length = 0; s0.fired.length = 0; s0.line = null; s0.shot = -1; auds.length = 0; sfx.length = 0; moods.length = 0; } const r = await pr; await sleep(450);
+  out.push(`it plays through and ends on its own: ${r.how === "done"}; overlay gone: ${!d.getElementById("intro") && !d.body.classList.contains("in-intro")}`);
+  out.push(`every line was shown, in order: ${r.said.join() === w.Intro.SCRIPT.map(l => l.id).join()}`);
+  out.push(`sound effects fired: ${[...new Set(sfx)].join(", ")} (${sfx.length} cues); the score moved through ${[...new Set(moods)].join(" > ")}`);
+  out.push(`a voice file was requested for every line when a voice is set: ${auds.length === 11 && auds[0] === "assets/voice/intro/i01.mp3" && auds[10] === "assets/voice/intro/i11.mp3"}`);
+  w.Intro.setVoice(null);
+  // 2. skip with Escape and with the button, mid-way
+  let p2 = w.Intro.play({ autostart: true }); await sleep(120); d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); const r2 = await p2; await sleep(450);
+  out.push(`Escape skips: ${r2.how === "skipped" && !d.getElementById("intro")}`);
+  p2 = w.Intro.play({ autostart: true }); await sleep(120); d.getElementById("in-skip").click(); const r3 = await p2; out.push(`the Skip button skips: ${r3.how === "skipped"}; seen flag saved: ${w.localStorage.getItem("lc_intro_seen") === "1"}`);
+  await sleep(450);
+  // 3. the pause menu can replay it
+  [...d.querySelectorAll("button")].find(b => /Menu/.test(b.textContent)).click(); await sleep(60); const pz = d.getElementById("pz-intro"); out.push(`the pause menu offers "Watch the opening": ${!!pz}`); if (pz) { pz.click(); await sleep(80); out.push(`and replays it: ${w.Intro.active}`); w.Intro.end("skipped"); await sleep(450); }
+  f.remove();
+  // 4. hand-over: a forced opening on a new game, skipped, then the first scene (Crane) begins
+  f = await load("?intro=1&new=1&savetest=1"); w = f.contentWindow; d = w.document; w.addEventListener("error", e => errs.push(e.message)); await sleep(400);
+  out.push(`?intro=1 forces it on a new game: ${!!d.getElementById("intro")}; sandbox/fast don't: checked in node`);
+  d.getElementById("in-skip").click(); await sleep(700);
+  out.push(`after the opening the story starts: ${w.Story && w.Story.busy ? "yes" : "no"}, the first box is ${/Crane|Item/.test((d.getElementById("dlg") || {}).textContent || "") ? "Crane's" : "not Crane's: " + ((d.getElementById("dlg") || {}).textContent || "").slice(0, 60)}`);
+  f.remove(); f = await load("?new=1&savetest=1"); await sleep(500); out.push(`a test-style URL (?new=1) skips it: ${!f.contentWindow.document.getElementById("intro")}`);
+  out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
+} catch (e) { out.push("THROWN " + e.message + " " + (e.stack || "").split("\n")[1]); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>
