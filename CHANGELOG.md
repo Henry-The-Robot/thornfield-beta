@@ -1,5 +1,11 @@
 # Changelog
 
+## T4: The Reeve's Court (the exam and the finale, day 28)
+- `court.js` + `court.css`: Vane's advocate makes 8 claims built from the player's own statements (profit is not Cash, receivables, "owns nothing", "Edric was unprofitable", the Duke's terms vs wages, a guarantee is a liability, payable-on-demand, margin vs markup, inventory, equity). PRESS for detail (it can turn up evidence), PRESENT a statement line, a case-board clue or a found card. Refute 6 of 8 to pass; a failed hearing offers another sitting with a fresh set of claims, never a game over.
+- Crane (trust 3+) testifies once (a free correct present); Ezra (trust 3+) confirms his rate. One Maud line per refuted claim (claim, number, reason); transcript evidence only for unhinted right presents.
+- Pass: certificate (farm name, score, date) -> letter "The thing I signed" -> Crane reads the seal -> Vane's offer comes due (your answer is saved as `vaneFinal`) -> Summer teaser reading the saved flags.
+- Called by `closeBooks()` with `{G, s, Story, Endings, st}`; standalone: `game.html?court=1` (careful-bot season). Tests: `test-court.js`, `court.html`. Screenshots in `docs/court-shots/`.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]

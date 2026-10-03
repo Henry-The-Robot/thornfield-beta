@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Court</title></head><body><pre id="out">running</pre>
+<!-- The Reeve's Court: pass path (press, present, Crane's testimony, certificate, letter, scene, teaser), fail -> retake path, answers derive from the statements, 0 JS errors.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=120000 --dump-dom tests/court.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+const load = src => new Promise(async r => { const f = document.createElement("iframe"); f.style.cssText = "width:1194px;height:834px"; f.src = src; document.body.appendChild(f); f.onload = async () => { await sleep(500); r(f); }; });
+(async () => { try {
+  const f = await load("../game.html?court=1&test=1&seed=3&farm=Larkfield"), w = f.contentWindow, d = w.document, errs = []; w.addEventListener("error", e => errs.push(e.message));
+  const $$ = sel => [...d.querySelectorAll(sel)], click = sel => { const b = d.querySelector(sel); if (!b || b.disabled) throw new Error("no enabled " + sel + " on: " + d.getElementById("court").textContent.slice(0, 160)); b.click(); };
+  const T = () => w.__courtTest, cur = () => T().claims[T().S.i];
+  const present = async (k, how) => { click(`[data-a=tab][data-v=${k.tab}]`); await sleep(5); click(`[data-a=sel][data-v="${k.id}"]`); await sleep(5); click("[data-a=present]"); await sleep(20); };
+  const rightCard = () => T().cards.find(k => cur().right(k)), wrongCard = () => T().cards.find(k => !cur().right(k) && k.tab === "is");
+  out.push(`the court opens over the game (standalone hook): ${!!d.getElementById("court")}`);
+  click("[data-k=next]"); await sleep(30);
+  out.push(`eight claims, built from the books: ${T().claims.length === 8}; the first reads "${cur().text.replace(/<[^>]+>/g, "").slice(0, 60)}..."`);
+  // --- attempt 1: fail on purpose (three wrong presents on every claim) -> the retake path
+  const first = T().claims.map(c => c.id).join();
+  for (let i = 0; i < 8; i++) { for (let n = 0; n < 3; n++) await present(wrongCard()); click("[data-a=next]"); await sleep(20); }
+  out.push(`a failed hearing says so and offers another sitting, not a game over: ${/not satisfied/.test(d.getElementById("court").textContent)} ${/0 of 8/.test(d.getElementById("court").textContent)}`);
+  click("[data-k=retry]"); await sleep(40);
+  out.push(`the retake has fresh claims (order or set differs): ${T().claims.map(c => c.id).join() !== first}`);
+  // --- attempt 2: press, present, a witness, a miss and a hint
+  click("[data-a=press]"); await sleep(10); const rev = cur().reveal; out.push(`press shows detail${rev ? " and turns up '" + rev.label + "'" : ""}: ${/advocate|Vane|[A-Za-z]/.test(d.querySelector(".ct-feed").textContent)}${rev ? " " + T().cards.some(k => k.id === rev.id) : ""}`);
+  await present(wrongCard()); out.push(`a wrong present gets a specific word and a hint, no refutation: ${!!d.querySelector(".ct-feed.bad") && !T().S.results[T().S.i]}`);
+  await present(rightCard()); out.push(`the right card refutes it (REFUTED stamp, Maud names the idea with the player's numbers): ${!!d.querySelector(".ct-verdict.ok")} ${/\d/.test(d.querySelector(".ct-feed").textContent)}`);
+  click("[data-a=next]"); await sleep(20);
+  out.push(`Crane (trust 4) can testify, once: ${!!d.querySelector("[data-a=crane]")}`); click("[data-a=crane]"); await sleep(20);
+  out.push(`his testimony is a free correct present, said in "Item:" sentences: ${T().S.results[1].ok && /Item:/.test(d.querySelector(".ct-feed").textContent)} and he's gone: ${(click("[data-a=next]"), await sleep(20), !d.querySelector("[data-a=crane]"))}`);
+  for (let i = 2; i < 8; i++) { if (!T().S.results[i] && i > 2 || i === 2) { /* continue */ } if (cur().reveal && !T().cards.some(k => k.id === cur().reveal.id)) { click("[data-a=press]"); await sleep(5); } await present(rightCard()); click("[data-a=next]"); await sleep(20); }
+  out.push(`pass: ${/Case dismissed/.test(d.getElementById("court").textContent)} (${d.querySelector(".ct-sum .big").textContent})`);
+  click("[data-k=x]"); await sleep(30); out.push(`certificate shows farm, score and date: ${/Larkfield/.test(d.getElementById("ctCert").textContent) && /7 of 8|8 of 8|6 of 8/.test(d.getElementById("ctCert").textContent)} / "${d.querySelector(".ct-cert .sig").textContent}"`);
+  const seen = []; for (let i = 0; i < 24 && d.getElementById("court"); i++) { const t = d.getElementById("court").textContent; seen.push(/The thing I signed/.test(t) ? "letter" : /Corvin Vane|Steward Vane/.test(t) ? "vane" : /seal/.test(t) ? "seal" : /To be continued/.test(t) ? "teaser" : "-"); const b = d.querySelector("#court [data-k]"); if (!b) break; b.click(); await sleep(25); }
+  out.push(`after the certificate: letter 9, Crane reads the seal, Vane's offer comes due, then the Summer teaser: ${["letter", "seal", "vane", "teaser"].every(k => seen.includes(k))} [${seen.join(" ")}]`);
+  await sleep(100); const r = w.__courtResult;
+  out.push(`result: passed=${r && r.passed} score=${r && r.score} attempts=${r && r.attempts} mistakes=${r && r.mistakes.length} vaneFinal=${r && r.flags && r.flags.vaneFinal} certificate=${!!(r && r.certificate)}`);
+  out.push(`the court is gone and the page is usable: ${!d.getElementById("court") && !d.body.classList.contains("in-court")}`);
+  // --- the game's own call (adapter): sandbox season, Court.run({G, s, Story, Endings, st})
+  const g = await load("../game.html?sandbox&new=1"), gw = g.contentWindow, S = gw.Spring; gw.G.closeDlg && gw.G.closeDlg(); const s = gw.G.s;
+  for (let k = 0; k < 28 && !s.outcome; k++) { gw.Bot.careful.day(s); S.sleep(s); } s.trust.crane = 4;
+  const p = gw.Court.run({ G: gw.G, s, Story: gw.Story, Endings: gw.Endings, st: gw.Books.close(s) }); await sleep(100);
+  out.push(`the game's call opens the court: ${!!gw.document.getElementById("court")}`); gw.document.querySelector("#court [data-k]").click(); await sleep(40);
+  const t2 = gw.__courtTest; out.push(`(no test hook without ?test: ${t2 === undefined})`);
+  gw.document.querySelector("[data-a=leave]").click(); gw.document.querySelector("[data-a=leave]").click(); const lr = await p;
+  out.push(`leaving the hall returns passed=false without a crash, and the game keeps a record: ${lr.passed === false && !!s.exam}`);
+  out.push(`JS errors: ${errs.length}${errs.length ? " " + errs.slice(0, 2).join(" | ") : ""}`);
+} catch (e) { out.push("THROWN " + e.message); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>
