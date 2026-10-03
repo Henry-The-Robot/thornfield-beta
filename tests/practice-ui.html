@@ -9,7 +9,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
   const btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), click = re => { const b = btns().find(x => re.test(x.textContent)); if (!b) throw new Error("no button " + re + " in " + btns().map(x => x.textContent)); b.click(); };
   while (s.day < 4) S.sleep(s); G.hud();
   G.talk("maud"); await sleep(60); out.push(`Maud offers today's problem: ${btns().some(b => /Maud's problem/.test(b.textContent))}`);
-  click(/Maud's problem/); await sleep(80);
+  click(/Maud's problem/); await sleep(80); click(/No stake/); await sleep(80); // the optional wager comes first (standing-ui.html covers it)
+  if (!d.getElementById("num")) { out.push("(today's problem is a choice question: practice-ui covers the numeric path, so skip a day to find one)"); while (!(() => { const p = w.Practice.pick(s, w.Transcript.state); return p && !p.choices; })()) { G.closeDlg(); S.sleep(s); } G.closeDlg(); G.talk("maud"); await sleep(80); click(/Maud's problem/); await sleep(80); click(/No stake/); await sleep(80); }
   const want = w.__want; out.push(`a number is asked for (answer ${want}): ${typeof want === "number" && !!d.getElementById("num")}`);
   d.getElementById("num").value = String(want + 7); click(/Check$/); await sleep(60); out.push(`a wrong number gets a hint and no credit: ${/Not /.test(d.getElementById("dlg").textContent) && !(s.practice && s.practice.done[s.day])}`);
   d.getElementById("num").value = String(want); click(/Check$/); await sleep(120);

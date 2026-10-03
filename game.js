@@ -211,7 +211,7 @@
       if (a[0] === "walk") { walked = true; window.__walked = true; extra = `<br><span class="hintline"><b>Here's my working:</b> ${work || hints.join(" ") + ` That gives ${answer}.`}<br>Now you enter it.</span>`; continue; }
       if (a[0] === "doc") { await openDoc(a[1].open); continue; }
       if (r.v != null && !isNaN(r.v) && Math.abs(r.v - answer) <= (tol || 0)) { window.__want = undefined; askSkip = null; toast(walked ? "Right. We'll come back to this one." : "Right."); return r.v; }
-      tries++; if (!walked) extra = `<br><i class="hintline">${isNaN(r.v) || r.v == null ? "Type a number." : `Not ${r.v}. `}${hints[Math.min(tries - 1, hints.length - 1)]}</i>`;
+      tries++; window.__tries = tries; if (!walked) extra = `<br><i class="hintline">${isNaN(r.v) || r.v == null ? "Type a number." : `Not ${r.v}. `}${hints[Math.min(tries - 1, hints.length - 1)]}</i>`;
     }
   }
   // ---------- feedback: no email address in the game; copy a text block the player pastes into their own email ----------
@@ -369,7 +369,40 @@
     const tip = !top ? "" : top.price > now ? `Prices are heading up: ${top.price} by day ${top.day}. Grain you don't have to ship before then could fetch more.` : top.price < now ? "Prices are slipping. Better to ship what you've promised and not hold surplus." : "Prices hold steady.";
     const text = `<b>Village notices</b><br>Going price today: <b>${now}</b> a sack.<br>${o.length ? o.map(x => `Day ${x.day}: ${x.price}${arrow(x.price)}`).join(" · ") : "The season is nearly over."}<br><i>${tip}</i>${n ? `<br><br><b>${n.title}</b><br>${n.text}` : ""}`;
     const opts = n ? n.options.map((label, i) => [label, () => { const r = act(() => S.answerNotice(s, i)); say(r.ok ? "maud" : null, r.ok ? noticeLesson(n.id, r.msg) : r.msg); }]) : [];
+    const nso = soOk() ? Standing.today(s).length : 0;
+    if (nso) opts.push([`Standing orders (${nso})`, standingBoard]);
     say(null, text, opts.concat([["Close", null]]));
+  }
+  // ---------- standing orders (standing.js): repeatable contracts on the notice board. Check one (margin, the best alternative sale, can Cash carry it, when the money comes), then take it or pass. ----------
+  const soOk = () => !!window.Standing && (!storyOn || Story.state.ch >= 5) && s.day >= Standing.MIN_DAY;
+  const shortWho = who => { const n = (S.NAMES[who] || who).split(",")[0], w = n.split(" "); return / the /.test(n) || w.length === 1 ? w[0] : w[w.length - 1]; }; // "Hobb the Miller" -> Hobb, "Widow Ashby" -> Ashby
+  function standingBoard() {
+    const list = soOk() ? Standing.today(s) : [];
+    if (!list.length) return say(null, "No standing orders on the board today. New ones go up each morning.", [["Back", noticeBoard], ["Close", null]]);
+    say(null, "<b>Standing orders</b><br>Regular buyers post a price. Check one before you take it: not every posted price is a good one.",
+      list.map(o => [`${shortWho(o.who)}: ${o.sacks} sacks at ${o.price}, ${o.terms ? `paid ${o.terms} days after` : "Cash"}, by day ${o.due}`, () => standingOrder(o)]).concat([["Back", noticeBoard], ["Close", null]]));
+  }
+  async function standingOrder(o) {
+    const f = Standing.facts(s, o), docs = [{ label: "Open the Ledger", open: ledger }], desc = `${o.sacks} sacks at ${o.price}${o.terms ? `, paid ${o.terms} days after delivery` : ", Cash on delivery"}, by day ${o.due}.`;
+    let k = await sayP(o.who, `A standing order: ${desc}`, ["Check it first", "Take it as posted", "Pass"]), checked = false;
+    if (k === 2) { Standing.mark(s, o.sid, "passed"); save(); return; }
+    if (k === 0) {
+      window.__walked = false;
+      await ask("maud", `Your cost is ${f.cost} a sack and they pay ${o.price}. What's your margin on this order, in %?`, f.margin, ["Margin is profit over the price you sell at.", "(Price − cost) ÷ price, as a percentage."], null, 1, docs, `(${o.price} − ${f.cost}) ÷ ${o.price} = ${f.margin}%.`, "Take the cost off the price, then divide what's left by the price. Try 5 − 4 = 1, and 1 ÷ 5 = 20%.");
+      checked = !window.__walked;
+      await sayP("maud", `Margin ${f.margin}%, and the road trader pays ${f.floor} for the same sack. The seed to buy is ${f.seed}, which leaves Cash at ${f.cashAfter}${o.terms ? `, and the money comes on day ${f.arrive}` : ""}.`, ["Next"]);
+      k = await sayP(o.who, `So: ${desc}`, ["Take it", "Pass"]); k = k === 0 ? 1 : 2;
+      if (k === 2) { Standing.mark(s, o.sid, "passed"); const j = Standing.judge(s, o, f); if (checked && !j.well) { for (const id of (j.why.indexOf("thin") >= 0 ? ["opportunity"] : []).concat(j.why.some(w => w !== "thin") ? ["wc"] : [])) TR.master(id, s.day); toast("Good pass: you checked first."); FX.sfx("good"); } save(); return say("maud", checked && !j.well ? j.line : "Fair. The board posts new ones every morning."); }
+    }
+    const off = S.addOffer(s, o.who, o.sacks, o.price, o.terms, o.dueIn, 1);
+    await haggle(off, { open: o.price, walk: o.price + 1, line: "A regular order, as posted." });
+    const ord = S.openOrders(s).find(x => x.id === off.id);
+    if (!ord) { S.decline(s, off.id); Standing.mark(s, o.sid, "passed"); save(); return; }
+    const j = Standing.judge(s, Object.assign({}, o, { price: ord.price }), Standing.facts(s, Object.assign({}, o, { price: ord.price })));
+    Standing.mark(s, o.sid, j.well ? "well" : "off");
+    if (checked && j.well) { ["margin", "opportunity"].forEach(id => TR.master(id, s.day)); FX.sfx("good"); toast("Taken well: you checked it first."); }
+    else if (!j.well) toast("Taken, but not well. Maud has a word.");
+    hud(); save(); drainUses(); say("maud", j.line);
   }
   function noticeLesson(id, msg) { // revealed after the choice, never before: the lesson lands because the player committed first
     return ({ tinker: { blind: "Two of the six were mouldy. You paid 60 for four good packets: 15 each, dearer than Tomas. A bargain you can't inspect isn't a bargain. The write-off is in the Ledger as a loss, and the 12 you saved shows up against Cost of goods sold.", inspected: "Smart: you paid 5 to learn two were mouldy, then bought only the four good ones for 40. The fee is an operating expense; the inspection made the cheap seed cheaper than Tomas's." , pass: "Fine. Tomas's seed costs more but you can trust it." },
@@ -458,13 +491,21 @@
   function maud() { const c = S.coach(s), has = !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
     say("maud", c ? c.text : Cast.greet("maud", s), opts); }
   // ---------- practice: one small problem a day on your own numbers (practice.js). A right answer on your own is evidence in the transcript; a walk-through is not. ----------
+  // An optional wager on the day's problem: right on the FIRST answer and the stake comes back doubled; anything else and Maud keeps it. 0 is always fine. Real Cash, posted so the books tie (Spring.wager).
+  async function wagerStake(topic) {
+    const mx = Math.min(3, s.bal.cash); if (mx < 1) return 0; const opts = []; for (let k = 0; k <= mx; k++) opts.push(k);
+    const r = await dlg({ who: "maud", text: `Today's problem is about <b>${topic}</b>: stake a few coin on getting it right first time? I pay the stake again if you do, and no stake is fine.`, choices: opts.map(k => k ? `Stake ${k}` : "No stake") });
+    const stake = opts[r.i] || 0; if (stake) act(() => S.wager(s, stake, "Practice wager")); return stake;
+  }
   async function problem() {
     if (s.practice && s.practice.done[s.day]) return say("maud", "That's today's. Come back tomorrow; the numbers will have moved.");
     const cmp = s.day >= 3 && s.offers.length >= 2 && (s.day % 3 === 0) ? Practice.compare(s) : null, p = cmp || Practice.available(s, TR.state);
     if (!p) return say("maud", "Nothing worth asking today. Your books are quiet.");
-    window.__walked = false; let right = true;
-    if (cmp) { const r = (await dlg({ who: "maud", text: p.text, choices: ["A", "B", "The same"] })).i; right = r === p.answer; if (!right) { await sayP("maud", `Not quite. ${p.work}`, ["I see"]); } }
-    else { await ask("maud", p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; }
+    const stake = await wagerStake(TR.name(p.concept)); // optional: a few coins on your first answer, never a gate
+    window.__walked = false; window.__tries = 0; let right = true, tries = 0;
+    if (cmp || p.choices) { const r = (await dlg({ who: "maud", text: p.text, choices: cmp ? ["A", "B", "The same"] : p.choices })).i; right = r === p.answer; tries = right ? 0 : 1; if (!right) { await sayP("maud", `Not quite. ${p.work}`, ["I see"]); } }
+    else { await ask("maud", p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; tries = window.__tries; }
+    if (stake) { if (right && tries === 0) { act(() => S.wagerWin(s, stake, "Practice wager")); FX.sfx("coin"); toast(`First answer right: you win ${stake}.`); } else toast(`Maud keeps your ${stake}.`); }
     const q = Practice.record(s, p, right, !right);
     if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust.maud != null && q.favour % 2 === 0 && s.trust.maud < 10) s.trust.maud++; toast(q.streak > 1 ? `${q.streak} days running ★` : "Maud nods."); }
     else toast("We'll come back to this one.");

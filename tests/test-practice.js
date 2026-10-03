@@ -24,4 +24,11 @@ ok(cmps > 0, "the two-offer comparison is built when offers are on the table");
   ok(s.practice.streak >= 8 && s.practice.favour === days.length, "right answers on consecutive days build a streak and earn favours");
   s.day = 20; ok(P.available(s, () => "introduced"), "a new day has a new problem"); const p2 = P.pick(s, () => "introduced"); P.record(s, p2, true, true); ok(P.available(s, () => "introduced") === null, "one problem a day");
   ok(s.practice.favour === days.length, "a walked-through answer earns no favour"); }
+// the four foundation problem types: each answer is derived from the engine
+{ const s = S.newGame({ story: false }); for (let d = 1; d <= 16; d++) { Bot.careful.day(s); S.sleep(s); } const get = id => P.BANK.find(b => b.id === id).make(s), c = S.R.unitCost;
+  const o = get("opportunity"); ok(o && o.answer === S.traderPrice(s.day) && /road trader pays/.test(o.text), `opportunity cost: the floor is the best alternative sale (${o && o.answer}), not the ${c} it cost`);
+  const e = get("ev"); const n = +/carry <b>(\d+)<\/b>/.exec(e.text)[1]; ok(e.answer === Math.round(.4 * n * c), `expected value of the caravan: 0.7 x ${n * c} - 0.3 x ${n * c} = ${e.answer}`);
+  const sc = get("scaling"), b = S.balanceSheet(s.bal); ok(sc && sc.answer === 2 * (b.inv + b.ar - b.ap - b.deposits), `scaling gap: double the sales, double the tied-up Cash (${sc && sc.answer})`);
+  const r = get("ruin"), f = S.crownFund(s), cost = +/lose all <b>(\d+)<\/b>/.exec(r.text)[1]; ok(r.answer === (f.net - cost >= f.crown ? 0 : 1) && r.choices.length === 2, `ruin: ${f.net} - ${cost} against the Crown's ${f.crown} -> ${r.choices[r.answer]}`);
+  const flips = new Set(); for (const e2 of [0, 4, 8, 10]) { const g = S.newGame({ story: false }); g.trust.ezra = e2; const t = P.BANK.find(x => x.id === "tvmflip").make(g); if (t) flips.add(t.answer); } ok(flips.size === 2, "the time-value answer flips as Ezra's rate moves (take the discount at a low rate, skip it at a high one)"); }
 process.exit(fail ? 1 : 0);

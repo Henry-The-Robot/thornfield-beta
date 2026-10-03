@@ -1,5 +1,11 @@
 # Changelog
 
+## T5: practice as play
+- **Standing orders** (`standing.js`): one or two repeatable contracts a day (days 3-26) on the notice board from Ashby, Hobb and Mira. Check one first (margin, the road trader's price for the same sack, the seed it needs and what that leaves in Cash, when the money arrives), then take it (haggled and shipped like any order) or pass. Some are traps: **thin** (no better than the best alternative sale), **slow** (the Cash lands after the season, or the next pay-day finds the chest short) and orders the chest **can't carry**. The verdict names which; a good take after the check, or a trap checked and passed, is transcript evidence.
+- **Maud's daily problem is now an optional wager:** stake 0-3 coin before seeing it; right on the first answer and it comes back doubled, anything else Maud keeps it. Real Cash, posted so the books tie. Never a gate.
+- **Four new problem types** for the foundation fixes: opportunity-cost floor, the time-value flip (answer changes with Ezra's rate), the scaling gap (tied-up Cash doubles with sales) and expected value vs ruin (an EV number, then "is it safe?"). Transcript gains "Opportunity cost" and "Expected value & ruin".
+- Tests: `test-standing.js`, `standing-ui.html`, `test-practice.js` extended.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]
