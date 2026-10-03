@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8"><title>WS7 Market Day</title></head><body><pre id="out">running</pre>
+<!-- Plays a whole fair through the real UI, on desktop (mouse) and iPad (touch): the ribbon button, set-up, the afternoon with Fast, the hour
+     pauses, the tally with its chart, Maud's bet on day 14, and then checks the books (balance sheet ties, cash-flow reconciles, Revenue/COGS moved),
+     the transcript, 44px targets, and zero JS errors. Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=60000 --dump-dom tests/market-day.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+function load(q, w, h) { return new Promise(res => { const f = document.createElement("iframe"); f.style.width = w + "px"; f.style.height = h + "px"; f.style.border = "0"; f.src = "../game.html" + q; document.body.appendChild(f); f.onload = () => res(f); }); }
+(async () => { try {
+  for (const [name, q, W, H] of [["desktop 1280x800 (mouse)", "?sandbox&new=1&touch=0", 1280, 800], ["iPad landscape 1194x834 (touch)", "?sandbox&new=1&touch=1", 1194, 834]]) {
+    const f = await load(q, W, H), w = f.contentWindow, d = w.document, G = w.G, S = w.Spring, M = w.Market, errs = []; w.addEventListener("error", e => errs.push(e.message)); await sleep(300); G.closeDlg(); G.hidePanel();
+    const P = t => out.push(`[${name}] ${t}`), click = id => { const b = d.getElementById(id); if (!b) throw new Error("no button " + id); b.click(); };
+    const s = G.s; w.localStorage.removeItem("lc_transcript_v2");
+    // not a fair day: no ribbon button, the stall explains itself
+    P(`day ${s.day}: no Market Day button in the ribbon: ${!d.querySelector("[data-mk=go]")}`);
+    // day 7, with 24 more sacks bought at cost (a real posting)
+    s.day = 7; S.post(s, "seed", "test: 24 sacks", { inv: 96, cash: -96 }); s.sacks += 24; G.hud(); await sleep(50);
+    const gb = d.querySelector("[data-mk=go]"); P(`day 7: the goal ribbon offers "To the stall" (${gb ? Math.round(gb.getBoundingClientRect().height) : 0}px tall, >= 44: ${!!gb && gb.getBoundingClientRect().height >= 44})`);
+    const cash0 = s.bal.cash, rev0 = -s.bal.revenue, sacks0 = s.sacks;
+    gb.click(); await sleep(60);
+    P(`overlay open: ${M.isOpen()}; setup shows a board, a sacks stepper and 'Open the stall'`);
+    const small = () => [...d.querySelectorAll("#mkt button")].filter(b => b.offsetParent && (b.getBoundingClientRect().height < 44 || b.getBoundingClientRect().width < 44)).map(b => b.textContent.trim() || b.dataset.st);
+    P(`all setup buttons >= 44px: ${JSON.stringify(small())}`);
+    const st = M.debug.st; P(`defaults: price ${st.price} (going price ${S.marketPrice(7)}), bring ${st.bring}`);
+    d.querySelector('[data-st="price+"]').click(); d.querySelector('[data-st="price+"]').click(); d.querySelector('[data-st="bring-"]').click();
+    P(`stepper: price ${st.price} (want ${S.marketPrice(7) + 2}), bring ${st.bring}; board shows "${d.getElementById("pricev").textContent.trim()}"`);
+    click("mk-open"); await sleep(40);
+    P(`afternoon started, phase ${st.phase}, hour ${st.f.hour} of 3, no Grisby on day 7: ${!st.f.grisby}; the Fast button is there: ${!!d.getElementById("mk-fast")}`);
+    click("mk-fast"); await sleep(40);
+    P(`Fast finished hour 1: phase ${st.phase}; its sales are on the books: Cash ${s.bal.cash - cash0 >= 0 ? "+" : ""}${s.bal.cash - cash0}`);
+    d.querySelector('[data-st="price-"]').click(); click("mk-next"); await sleep(40);
+    P(`hour 2 played at price ${st.f.hours[1].price}; phase ${st.phase}`);
+    click("mk-next"); await sleep(60);
+    P(`tally reached: ${st.phase === "tally"}; chart drawn: ${!!d.querySelector("#mkt svg.mk-chart")}; ${d.querySelectorAll("#mkt .mk-tab tr").length - 2} hour rows; Maud names the curve: ${/demand curve\. Yours/.test(d.getElementById("mkt").textContent)}`);
+    P(`tally buttons >= 44px: ${JSON.stringify(small())}; no clipped overlay (scrollWidth ${d.getElementById("mkt").scrollWidth} <= ${d.getElementById("mkt").clientWidth}): ${d.getElementById("mkt").scrollWidth <= d.getElementById("mkt").clientWidth}`);
+    const t = M.totals(st.f); const bs = S.balanceSheet(s.bal), cl = w.Books.close(s);
+    P(`takings ${t.revenue}, units ${t.units}; Cash +${s.bal.cash - cash0} (${s.bal.cash - cash0 === t.revenue}); Revenue +${-s.bal.revenue - rev0}; barn ${sacks0} -> ${s.sacks} (${sacks0 - s.sacks === t.units}); unsold ${t.unsold} stay in the barn`);
+    P(`books tie: Assets ${bs.assets} = Liabilities + Equity ${bs.liab + bs.equity}: ${bs.assets === bs.liab + bs.equity}; cash-flow reconciles: ${cl.cf.reconciles}; Inventory ties to the barn: ${s.bal.inv === s.sacks * 4 + s.seeds * 12 + s.plots.filter(p => p.crop).length * 12}`);
+    P(`transcript: demand ${w.Transcript.state("demand")}, segments ${w.Transcript.state("segments")}, competitor ${w.Transcript.state("competitor")} (none on day 7)`);
+    click("mk-done"); await sleep(30);
+    P(`pack up closes the overlay: ${!M.isOpen() && !d.getElementById("mkt")}; the ribbon button is gone for today: ${!d.querySelector("[data-mk=go]")}; fair remembered: ${s.market.fairs.length === 1}`);
+    G.interactTile(38, 19); await sleep(60); P(`tapping the stall again today: Maud says it is done: ${/had your fair today/.test(d.getElementById("dlg").textContent)}`); G.closeDlg();
+    // day 14: Grisby and Maud's bet
+    s.day = 14; G.hud(); await sleep(30); const j0 = s.journal.length; M.open(); await sleep(40);
+    const st2 = M.debug.st; d.querySelector('[data-st="price+"]').click(); click("mk-open"); await sleep(40);
+    P(`day 14: Maud's bet is offered: ${st2.phase === "bet"} with ${d.querySelectorAll("#mkt [data-bet]").length} choices; buttons >= 44px: ${JSON.stringify(small())}`);
+    const ans = M.betAnswer(s, st2.price, st2.bring).answer, c14 = s.bal.cash; d.querySelector(`[data-bet="${ans}"]`).click(); await sleep(40);
+    P(`bet placed on the model's answer "${ans}": stake 2 posted (Cash ${c14} -> ${s.bal.cash}); Grisby's stall on screen: ${st2.f.grisby}`);
+    click("mk-fast"); await sleep(30); while (st2.phase !== "tally") { click("mk-next"); await sleep(30); }
+    P(`tally with the bet: ${/Maud's bet/.test(d.getElementById("mkt").textContent)}, won: ${/You won/.test(d.getElementById("mkt").textContent)}; Grisby line: ${/Grisby (took|sold)/.test(d.getElementById("mkt").textContent)}; transcript competitor ${w.Transcript.state("competitor")}`);
+    const bs2 = S.balanceSheet(s.bal); P(`books after day 14 still tie: ${bs2.assets === bs2.liab + bs2.equity}, cash-flow reconciles ${w.Books.close(s).cf.reconciles}; journal +${s.journal.length - j0} postings, all balanced: ${s.journal.slice(j0).every(e => Object.values(e.lines).reduce((a, v) => a + v, 0) === 0)}`);
+    click("mk-done"); await sleep(30);
+    P(`two fairs remembered: ${s.market.fairs.length === 2}; chart now has the earlier fair's dots too (see screenshot); JS errors: ${JSON.stringify(errs)}`);
+    // quitting mid-afternoon must not let the same fair be played again (the first posted hour records the fair; the save keeps it)
+    s.day = 21; G.hud(); const sacks21 = s.sacks; M.open(); await sleep(30); const st3 = M.debug.st; click("mk-open"); await sleep(30); click("mk-fast"); await sleep(30);
+    const fairsMid = s.market.fairs.some(x => x.day === 21), cashMid = s.bal.cash; M.close(); await sleep(30);
+    P(`day 21: after ONE hour the fair is already recorded (${fairsMid}) and a quit-and-reload cannot replay it: stall available again ${M.available(s)} (want false); hour 1 sales stayed on the books (barn ${sacks21} -> ${s.sacks})`);
+    const saved = JSON.parse(JSON.stringify(s)); P(`a saved copy still carries the fair: ${saved.market.fairs.some(x => x.day === 21)}; transcript competitor only for a price above the going price: ${w.Transcript.state("competitor")} (day 14 raised it)`); void st3; void cashMid;
+    f.remove();
+  }
+  } catch (e) { out.push("EXCEPTION " + e.message + " " + e.stack); }
+  document.getElementById("out").textContent = "RESULTS\n" + out.join("\n"); document.querySelectorAll("iframe").forEach(f => f.remove());
+})();
+</script></body></html>

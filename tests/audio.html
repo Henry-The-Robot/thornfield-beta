@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Sound and music</title></head><body><pre id="out">running</pre>
+<!-- The score and the sound effects. Offline-rendered music is checked as signal (non-silent, not clipping, deterministic, each mood different, a sane number of audio nodes
+     per bar); the effects and the live scheduler run against a fake AudioContext; the preferences default to ON and honour the old switch.
+     Run: node tests/run-html.js tests/audio.html   (real-time Chromium via Playwright: --virtual-time-budget never advances an OfflineAudioContext) -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+const stats = d => { let s = 0, pk = 0, zc = 0; for (let i = 0; i < d.length; i++) { s += d[i] * d[i]; pk = Math.max(pk, Math.abs(d[i])); if (i && (d[i] >= 0) !== (d[i - 1] >= 0)) zc++; } return { rms: Math.sqrt(s / d.length), peak: pk, zc: zc / d.length }; };
+async function load(setup) { const f = document.createElement("iframe"); f.style.width = "1100px"; f.style.height = "700px"; f.src = "../game.html?sandbox&new=1&touch=1"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(200); return f; }
+(async () => { try {
+  const f = await load(), w = f.contentWindow, errs = []; w.addEventListener("error", e => errs.push(e.message));
+  const M = w.Music, SR = 22050, SECS = 12, res = {};
+  for (const name of M.moods) {
+    const oc = new w.OfflineAudioContext(1, SR * SECS, SR), bus = oc.createGain(); bus.connect(oc.destination); const info = M.render(oc, bus, name, SECS); const buf = await oc.startRendering(); const d = buf.getChannelData(0);
+    res[name] = Object.assign(stats(d), info, { sig: Array.from(d.slice(SR, SR + 400)).map(x => Math.round(x * 1e4)).join(",") });
+    const r = res[name]; out.push(`${name}: ${r.bars} bars, rms ${r.rms.toFixed(4)}, peak ${r.peak.toFixed(2)}, <=${r.maxNodesPerBar} nodes a bar: ${r.rms > .004 && r.rms < .3 && r.peak < 1 && r.maxNodesPerBar <= 140}`);
+  }
+  const sigs = new Set(Object.values(res).map(r => r.sig)), zcs = Object.values(res).map(r => r.zc);
+  out.push(`every mood sounds different (${sigs.size} of ${M.moods.length} distinct renders; zero-crossing rate ${Math.min(...zcs).toFixed(3)}..${Math.max(...zcs).toFixed(3)}): ${sigs.size === M.moods.length && Math.max(...zcs) > Math.min(...zcs) * 1.15}`);
+  { const a = new w.OfflineAudioContext(1, SR * 4, SR), b = new w.OfflineAudioContext(1, SR * 4, SR); [a, b].forEach(c => { const g = c.createGain(); g.connect(c.destination); M.render(c, g, "farm", 4); });
+    const da = (await a.startRendering()).getChannelData(0), db = (await b.startRendering()).getChannelData(0); let same = true; for (let i = 0; i < da.length; i += 97) if (Math.abs(da[i] - db[i]) > 1e-6) { same = false; break; }
+    out.push(`the same mood renders identically twice (seeded, no random notes): ${same}`); }
+  // fake context for the effects and the live scheduler
+  const log = { made: 0, osc: 0, src: 0, running: false };
+  class Mock { constructor() { log.made++; this.state = "running"; this.t0 = performance.now(); this.destination = {}; this.sampleRate = 22050; w.__mac = this; }
+    get currentTime() { return (performance.now() - this.t0) / 1000; }
+    resume() { return Promise.resolve(); } createBuffer(c, n) { return { getChannelData: () => new Float32Array(n || 1) }; }
+    createBufferSource() { log.src++; return { connect() {}, start() {}, stop() {}, set buffer(v) {}, loop: false }; }
+    createOscillator() { log.osc++; const p = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} }); return { type: "", frequency: p(), connect() {}, start() {}, stop() {} }; }
+    createGain() { return { gain: { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} }, connect() {} }; }
+    createBiquadFilter() { return { type: "", frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, Q: {}, connect() {} }; }
+    createDynamicsCompressor() { return { threshold: {}, ratio: {}, connect() {} }; } }
+  w.AudioContext = Mock; w.webkitAudioContext = Mock; w.FX.setSfx(true); w.FX.setMusic(true); w.FX.unlock(); await sleep(50);
+  let bad = [], silent = [];
+  for (const n of w.FX.names) { const o0 = log.osc + log.src; try { w.FX.sfx(n); } catch (e) { bad.push(n); } if (log.osc + log.src === o0) silent.push(n); }
+  out.push(`all ${w.FX.names.length} sound effects play without errors and make sound (${w.FX.names.join(", ")}): ${bad.length === 0 && silent.length === 0} ${bad.concat(silent).join(",")}`);
+  { const o0 = log.osc; w.FX.blip("maud", 1); w.FX.blip("crane", 2); w.FX.blip("nobody", 3); out.push(`dialogue blips: every speaker has a voice, an unknown one falls back: ${log.osc - o0 === 3}`); }
+  { w.FX.setSfx(false); const o0 = log.osc + log.src; w.FX.sfx("harvest"); w.FX.sfx("step"); out.push(`effects switched off are silent: ${log.osc + log.src === o0}`); w.FX.setSfx(true); }
+  M.setMood("crane"); out.push(`setMood switches the piece (the game's own chooser may move it again a moment later): ${M.mood === "crane"}`);
+  await sleep(300); out.push(`the live scheduler runs once music is on and unlocked: ${M.running}`);
+  const o1 = log.osc; await sleep(3500); out.push(`and keeps scheduling bars as time passes (${log.osc - o1} oscillators in 3.5 s): ${log.osc > o1}`);
+  w.FX.setMusic(false); out.push(`music off stops the scheduler: ${!M.running}`); const o2 = log.osc; await sleep(800); out.push(`and nothing more is scheduled: ${log.osc === o2}`);
+  out.push(`errors: ${JSON.stringify(errs)}`); f.remove();
+  // preferences: default ON; the old one-switch value is honoured
+  const keys = ["lc_sfx", "lc_music", "lc_sound"];
+  const probe = async set => { const g = await load(); const wg = g.contentWindow; keys.forEach(k => wg.localStorage.removeItem(k)); Object.entries(set).forEach(([k, v]) => wg.localStorage.setItem(k, v)); wg.location.reload(); await new Promise(r => g.onload = r); await sleep(200); const r = [wg.FX.sfxOn, wg.FX.musicOn]; keys.forEach(k => wg.localStorage.removeItem(k)); g.remove(); return r; };
+  out.push(`first visit: sound effects and music are both ON: ${JSON.stringify(await probe({})) === "[true,true]"}`);
+  out.push(`the old "lc_sound = 0" is honoured (both off): ${JSON.stringify(await probe({ lc_sound: "0" })) === "[false,false]"}`);
+  out.push(`the new switches are independent (effects on, music off): ${JSON.stringify(await probe({ lc_sfx: "1", lc_music: "0" })) === "[true,false]"}`);
+ } catch (e) { out.push("EXCEPTION " + e.message + " " + e.stack); }
+  document.getElementById("out").textContent = "RESULTS\n" + out.join("\n"); document.querySelectorAll("iframe").forEach(f => f.remove());
+})();
+</script></body></html>

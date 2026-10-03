@@ -2,7 +2,45 @@
 
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v0.4.0-beta (candidate)]
+
+Integrates PRs #27 (sound and music), #28 (cast, scenes, letters), #29 (practice), #30 (WS7 Market Day) and #31 (WS6 story spine) on `integrate-s1`. Do not release before creative-lead review. Cache-bust stamp `?v=0.4.0`.
+
+### Integration decisions (canon, `projects/mba-game/TASKS-season1.md`)
+- WS6's structure and mechanics (four weeks and title cards, Crane's buy-out offer, endings, case board, timeline scenes, escalating orders, time-value scene, seeded events, farm name) with #28's words and characters (cast voices, scenes, letters, flags).
+- The villain is **Corvin Vane** everywhere ("Steward Vane" renamed). Crane is the honest ex-clerk, not Vane's man: he delivers the day-1 offer as an instructed messenger ("Item: I do not recommend it").
+- Village scenes keep their days except two that landed on a story beat and moved +1: Crane's off-duty scene 12 to 13 (day 12 is Vane's first order), Crane's seal scene 22 to 23 (day 22 is the week-4 card).
+- A village scene that reveals a clue also pins a card on the case board. Practice problems pin nothing.
+- Edric's letters: #28's nine keep their numbers; WS6's midpoint page is letter 10, "The same order" (found the night Vane brings his order).
+- Maud no longer answers with only a "Next:" hint when a village scene or the day's practice problem is waiting (it was unreachable during the story, days 9-14); game.js shows her menu instead.
+- `Music` and `Sound effects` switches in the pause menu; the single shared audio context and first-tap unlock from #17/#25 are kept.
+
+### Added: Market Day (WS7, #30)
+- Days 7, 14 and 21: a stall on the square. Set a price per hour, watch who buys (thrifty, comfortable, in a hurry), a demand chart in the tally, Maud's bet on day 14, Grisby's rival stall from day 14. Every sale goes through the books (Cash, Revenue, Inventory) and the cash-flow statement still reconciles. Details: `TEST-RESULTS-WS7.md`.
+
+### Added: the four-week story spine (WS6, #31)
+- Four weeks with title cards (day 1, 8, 15, 22) and a goal ribbon "Week N · title"; Crane's standing buy-out offer (day 1 and from the Desk; a mercy price when you cannot cover wages); four endings (sold out, seized, bridged, free) with epilogues and what they unlock; the case board (every lesson, letter and village scene pins a clue); the time-value scene at Tomas; Corvin Vane's escalating orders (day 12 half, day 15 whole); Edric's cash book in week 4; seeded event nights; name your farm. Details: `TEST-RESULTS-WS6.md`.
+
+### Added: Maud's problem (practice, #29)
+- A new problem every day, set by Maud on your own live numbers (gross margin on your last sale, the equation, inventory, receivables, interest, Cash at the next pay-day, the discount, break-even, current ratio, operating income, deposits, the Crown fund). Desk menu or talk to Maud.
+- Every third day, with two offers on the table, she asks which puts more Cash in the chest by day 28.
+- Right on your own = transcript evidence (mastery needs several days), a streak, and favour (Maud trusts you more). Hinted or walked-through = no credit.
+- Tests: `test-practice.js` (1100+ generated problems checked against the engine), `practice-ui.html`.
+
+### Added: story, cast and letters
+- **A cast with a spine** (`cast.js`, `docs/STORY-BIBLE.md`): every villager has a look, a verbal habit, a mantra, a want and a secret, and a greeting pool that responds to the weather and the chest. Walk up to anyone with no business and they speak, then offer "Ask about..." topics, some locked until you have earned their trust (hearts) or the story has reached them.
+- **The mystery**: why a profitable farm went broke, and who wanted it to. Edric stood surety for Ashby's bakery (a guarantee the Ledger never showed), the Crown sold the note to **Steward Vane**, and Vane is buying up every note in the valley to call them in at Midwinter. The Duke's order is his gambit.
+- **12 village scenes** (`scenes.js`, days 9-28): optional, one-time, marked by a red "!" on the speaker. A scene IS a lesson: Hobb's request for seven more days is a real credit decision (it changes his invoice); Vane's "partnership" is a payable-on-demand covenant. Six clues, flags saved for Summer.
+- **Edric's nine letters** (from five): found where the lessons are, reread from the desk ("Edric's letters"); the last turns the season into a mystery.
+- Chapter dialogue rewritten in each character's voice (Crane's forty-one items, Tomas's patter, Ashby's "none of his luck", Hobb's pauses, Ezra's price-not-judgement, Vane's opportunity). "The Duke's steward" is now **Steward Vane**.
+- `tests/test-cast.js` (every line fits a dialogue box and has no placeholders, greetings vary and respond, topics are earned, every scene plays through every choice keeping the books balanced, the clue count matches), `tests/story-ui.html`.
+
+### Added: sound and music
+- **Score** (`music.js`): a small generative composer in six moods (farm, town waltz, rain, night lullaby, tense, the bailiff's march), all synthesized with WebAudio, so no audio files and it works offline. The score follows the game: the bailiff's march in chapter 1, night music while you sleep, rain on rainy days, the town waltz east of the village square, a heartbeat when the chest can't cover the next pay-day or the Duke's order is open.
+- **24 sound effects** (`fx.js`): footsteps, tilling, planting, watering, harvest, shipping, page turns, button taps, error buzz, stamp, sleep and morning, mastery chime, rain, and more. Each character has their own typewriter voice (pitch and timbre).
+- **On by default** (after the first tap, which iOS requires), with two switches in the menu: Music and Sound effects. The old one-switch setting is honoured if it was explicitly off. iOS ringer-switch workaround (a "playback" audio session).
+- `sound.html`: a sound check page (every mood, effect and voice on a button) so the music can be judged by ear.
+- `tests/audio.html` (run with `node tests/run-html.js`): renders every mood offline and checks the signal (non-silent, no clipping, deterministic, each different, node budget), runs all effects and the live scheduler against a fake context, and checks the preferences.
 
 ### Creative lead's list (v0.3.2 candidates, one PR each into `next`)
 - 1 Overtrading loses: one `R.duke` order (132 sacks, 28-day terms) shared by story and sandbox; `test-crown` asserts careful pays, overtrader and reckless lose.

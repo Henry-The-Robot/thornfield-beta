@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>v0.4 integration screenshot driver</title><style>html,body{margin:0;background:#222}iframe{border:0;display:block;width:1194px;height:834px}pre{display:none}</style></head>
+<body><iframe id="f"></iframe><pre id="out">running</pre>
+<!-- Drives the integrated game (audio, cast and scenes, practice, Market Day, story spine) to one screen for a 1194x834 screenshot (see shoot-int.js).
+     shot = offer | week | village | practice | casebd | pause | market. Add &check=1 and use --dump-dom to read what happened instead of taking a picture. -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), P = new URLSearchParams(location.search), shot = P.get("shot"), f = document.getElementById("f"), out = document.getElementById("out"), errs = [];
+f.src = "../game.html?fast=1&new=1&seed=3&touch=1";
+f.onload = async () => {
+  await sleep(500);
+  const w = f.contentWindow, G = w.G, d = w.document, S = w.Spring, St = w.Story, s = G.s; w.addEventListener("error", e => errs.push(e.message));
+  const play = n => { St.state.ch = 5; St.state.stage = "run9"; s.quiet = false; for (let i = 0; i < n; i++) { w.Bot.careful.day(s); S.sleep(s); } const wk = St.weekOf(s.day); G.goal(St.goalTexts().run9, 9, `Week ${wk} · ${St.WEEKS[wk].title}`); G.hud(); };
+  const dlgBtn = () => { const b = d.querySelector("#dlg .ch button"); return b && d.getElementById("dlg").style.display === "flex" ? b : null; };
+  const pump = async (cond, max) => { for (let i = 0; i < (max || 300) && !cond(); i++) { const pg = d.getElementById("pgok"); if (d.getElementById("panel").style.display !== "none" && pg) pg.click(); else { const b = dlgBtn(); if (b) b.click(); } await sleep(30); } };
+  G.closeDlg(); G.hidePanel(); if (shot !== "offer") St.testScene("none"); // the opening scene is still waiting on its dialog: this frees the story (busy = false) so the screen under test can run
+  const log = [];
+  if (shot === "offer") { St.testScene("offer"); await sleep(200); }
+  else if (shot === "week") { play(6); s.day = 8; St.state.stage = "tomas6"; St.state.ch = 6; G.hud(); St.after("morning"); St.weekCard(2, true); }
+  else if (shot === "village") { play(8); log.push("day " + s.day); G.talk("maud"); await sleep(300); log.push("scene waiting played: " + !!s.scenes.maud_abacus); }
+  else if (shot === "practice") { play(3); G.talk("maud"); await sleep(200); const b = [...d.querySelectorAll("#dlg .ch button")].find(x => /problem/i.test(x.textContent)); log.push("problem button " + !!b); if (b) b.click(); await sleep(300); }
+  else if (shot === "casebd") {
+    play(12); log.push("day " + s.day);
+    St.pin("equation", "Assets = Liabilities + Owner's equity", "896 = 1,100 + (-204)", "Day 1 · Crane's writ"); St.pin("margin", "Gross profit & margin", "7 − 4 = 3 a sack; 43%", "Day 3 · Ashby"); St.pin("page5", "Edric's letter: On the bailiff", "“If you are reading this, Crane has found you first…”", "Day 1 · Edric's journal", "page");
+    const before = St.state.clues.length;
+    G.talk("tomas"); await sleep(200); await pump(() => !dlgBtn() && !St.busy, 200); await sleep(100);
+    log.push(`Tomas's scene played: ${!!s.scenes.tomas_contracts}; clues on the board ${before} -> ${St.state.clues.length}; scene card pinned: ${St.state.clues.some(c => c.id === "scene_tomas_contracts")}`);
+    d.getElementById("dlg").style.display = "none"; St.caseBoard(); await sleep(300);
+  }
+  else if (shot === "pause") { w.dispatchEvent(new w.KeyboardEvent("keydown", { code: "Escape" })); await sleep(200); log.push("pause menu open: " + !!d.getElementById("pause") + "; Music and Sound buttons: " + !!d.getElementById("pz-music") + "/" + !!d.getElementById("pz-sound")); }
+  log.push("JS errors: " + errs.length + " " + JSON.stringify(errs));
+  out.textContent = "RESULTS\n" + log.join("\n"); document.title = "ready " + shot;
+};
+</script></body></html>

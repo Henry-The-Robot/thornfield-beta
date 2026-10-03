@@ -21,8 +21,11 @@
     C0: [["margin", "Margin vs markup"], ["tvm", "Interest & the time value of money"], ["pct", "Ratios & percentages"]],
     C1: [["equation", "Assets = Liabilities + Owner's equity"], ["accrual", "Accrual vs cash"], ["ar", "Accounts receivable"], ["ap", "Accounts payable"],
       ["inventory", "Inventory & Cost of goods sold"], ["gross", "Gross profit"], ["depreciation", "Depreciation"], ["statements", "The three statements"],
-      ["cfs", "Cash-flow statement (indirect method)"], ["ratios", "Current ratio"]],
+      ["cfs", "Cash-flow statement (indirect method)"], ["ratios", "Current ratio"], ["interest", "Interest (the price of a loan)"], ["unearned", "Unearned revenue (customer deposits)"]],
     C2: [["operating", "Operating income"], ["breakeven", "Break-even"], ["wc", "Working capital"], ["overtrading", "Overtrading"], ["insolvency", "Profitable but broke"]],
+    // WS7 (Market Day): these course rows stay locked until Year One, but the ideas are earned now at the weekly fair (C4.01, C4.02, C8.02)
+    C4: [["demand", "Demand & the price you set"], ["competitor", "Pricing against a rival"]],
+    C8: [["segments", "Customer segments"]],
   };
   const CODEX_IDS = ["accrual", "ar", "ap", "inventory", "gross", "operating", "wc", "overtrading", "insolvency", "breakeven", "margin", "tvm", "statements"];
   let mem = {};

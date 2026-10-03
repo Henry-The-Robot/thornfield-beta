@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>WS6 screenshot driver</title><style>html,body{margin:0;background:#222}iframe{border:0;display:block;width:1280px;height:800px}</style></head>
+<body><iframe id="f"></iframe>
+<!-- Sets up one WS6 scene in the real game so headless Chrome can screenshot it (see shoot-ws6.js, which runs every shot).
+     shot = week1 | week2 | week3 | week4 | corvin | tied | page | cashbook | offer | desk | tvm -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), P = new URLSearchParams(location.search), shot = P.get("shot"), f = document.getElementById("f");
+f.src = "../game.html?fast=1&new=1&seed=3&touch=0" + (shot === "corvin" || shot === "tied" ? "&at=36,12" : "");
+f.onload = async () => {
+  await sleep(500);
+  const w = f.contentWindow, G = w.G, d = w.document, S = w.Spring, St = w.Story, s = G.s;
+  document.title = "shot " + shot;
+  const play = n => { St.state.ch = 5; s.quiet = false; for (let i = 0; i < n; i++) { w.Bot.careful.day(s); S.sleep(s); } G.hud(); }; // a real, played-through state, not day 1 with the date changed
+  const pump = async cond => { for (let i = 0; i < 400 && !cond(); i++) { const pg = d.getElementById("pgok"); if (d.getElementById("panel").style.display !== "none" && pg) { if (cond()) break; pg.click(); } else { const b = d.querySelector("#dlg .ch button"); if (b && d.getElementById("dlg").style.display === "flex") b.click(); } await sleep(30); } };
+  G.closeDlg(); G.hidePanel();
+  if (/^week/.test(shot)) { const n = +shot.slice(4), stage = ["", "ashby3", "tomas6", "sleep9", "run9"][n]; play(n === 1 ? 0 : (n - 1) * 7 - 1); s.day = (n - 1) * 7 + 1; St.state.stage = stage; St.state.ch = [0, 2, 6, 8, 9][n]; G.hud(); St.after("morning"); St.weekCard(n, true); }
+  else if (shot === "desk") { play(0); G.desk(); }
+  else if (shot === "corvin") { play(11); St.testScene("corvin"); }
+  else if (shot === "tied") { play(11); St.testScene("tied"); await pump(() => d.querySelector(".vtl-tied")); }
+  else if (shot === "page") { play(11); St.testScene("page"); await sleep(100); }
+  else if (shot === "cashbook") { play(21); St.testScene("cashbook"); await pump(() => d.querySelector("#panelBody .stm") && d.getElementById("pgok")); }
+  else if (shot === "offer") { St.testScene("offer"); }
+  else if (shot === "tvm") { play(7); St.testScene("tvm"); await pump(() => d.querySelector(".vtl-rate")); }
+};
+</script></body></html>

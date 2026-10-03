@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Practice in the UI</title></head><body><pre id="out">running</pre>
+<!-- Maud's problem from the desk and from Maud herself: right answer = evidence + favour, wrong answer = a hint, one a day.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=40000 --dump-dom tests/practice-ui.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.style.width = "1180px"; f.style.height = "800px"; f.src = "../game.html?sandbox&new=1"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(400);
+  const w = f.contentWindow, d = w.document, G = w.G, s = G.s, S = w.Spring, errs = []; w.addEventListener("error", e => errs.push(e.message)); G.closeDlg(); G.hidePanel();
+  const btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), click = re => { const b = btns().find(x => re.test(x.textContent)); if (!b) throw new Error("no button " + re + " in " + btns().map(x => x.textContent)); b.click(); };
+  while (s.day < 4) S.sleep(s); G.hud();
+  G.talk("maud"); await sleep(60); out.push(`Maud offers today's problem: ${btns().some(b => /Maud's problem/.test(b.textContent))}`);
+  click(/Maud's problem/); await sleep(80);
+  const want = w.__want; out.push(`a number is asked for (answer ${want}): ${typeof want === "number" && !!d.getElementById("num")}`);
+  d.getElementById("num").value = String(want + 7); click(/Check$/); await sleep(60); out.push(`a wrong number gets a hint and no credit: ${/Not /.test(d.getElementById("dlg").textContent) && !(s.practice && s.practice.done[s.day])}`);
+  d.getElementById("num").value = String(want); click(/Check$/); await sleep(120);
+  out.push(`the right number is recorded for the day (streak ${s.practice.streak}, favour ${s.practice.favour}): ${s.practice.done[s.day] === 2 && s.practice.favour === 1}`);
+  G.closeDlg(); G.talk("maud"); await sleep(60); out.push(`only one a day: ${!btns().some(b => /Maud's problem/.test(b.textContent))}`);
+  out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
+} catch (e) { out.push("THROWN " + e.message); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>

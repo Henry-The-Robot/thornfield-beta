@@ -30,5 +30,5 @@ const upTo = (s, d) => { while (s.day < d && !s.over) S.sleep(s); };
   s.bal.cash += 50; s.bal.capital -= 50; const growing = s.plots.filter(p => p.crop && p.crop.age < S.R.growDays); S.answerNotice(s, 0); S.sleep(s); ok(growing.length > 0 && growing.every(p => p.crop.age >= 2), "hired hands: every growing crop gains a day overnight"); }
 { const s = S.newGame(); const o = S.marketOutlook(s); ok(o.length === 3 && o[0].day === 2, "the board shows the next three days' prices"); }
 // --- frost pile-up coaching
-{ const s = S.newGame(); upTo(s, 20); const o = S.addOffer(s, "ashby", 18, 9, 0, 3, 3); S.accept(s, o.id); ok(/Frost on day 23/.test(S.coach(s).text), "Maud warns when an order falls due around the frost"); }
+{ const s = S.newGame(), F = S.eventDay(s, "frost"); upTo(s, F - 3); const o = S.addOffer(s, "ashby", 18, 9, 0, 3, 3); S.accept(s, o.id); ok(new RegExp("Frost on day " + F).test(S.coach(s).text), "Maud warns when an order falls due around the frost (day " + F + ", read from the game)"); }
 process.exit(fail ? 1 : 0);
