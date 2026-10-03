@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Story in the UI</title></head><body><pre id="out">running</pre>
+<!-- A scene's "!" marker, playing a scene by tapping, the Ask-about menu with trust-locked topics, Crane appearing by the well, Edric's letters panel.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=40000 --dump-dom tests/story-ui.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.style.width = "1180px"; f.style.height = "800px"; f.src = "../game.html?sandbox&new=1&touch=1"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(300);
+  const w = f.contentWindow, d = w.document, G = w.G, s = G.s, S = w.Spring, errs = []; w.addEventListener("error", e => errs.push(e.message)); G.closeDlg(); G.hidePanel();
+  const txt = () => d.getElementById("dlg").textContent, btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), click = re => { const b = btns().find(x => re.test(x.textContent)); if (!b) throw new Error("no button " + re + " in " + txt().slice(0, 120)); b.click(); };
+  // before day 9 Maud just talks (and offers to be asked about things)
+  G.talk("maud"); await sleep(50); out.push(`day 1: Maud has her coaching line and an Ask-about door: ${btns().some(b => /Ask about something/.test(b.textContent)) || btns().length >= 2}`);
+  if (btns().some(b => /Ask about something/.test(b.textContent))) { click(/Ask about something/); await sleep(50); }
+  const labels0 = btns().map(b => b.textContent); out.push(`topics locked behind trust stay hidden (${labels0.length} choices at 2 hearts): ${!labels0.some(l => /why she's helping/.test(l))}`);
+  click(/abacus/); await sleep(50); out.push(`a topic plays as a short speech: ${/accurate|lies slowly/.test(txt())}`); for (let i = 0; i < 4 && /Next/.test(btns().map(b => b.textContent).join()); i++) { click(/Next/); await sleep(30); }
+  out.push(`hearing a topic the first time earns trust (Maud ${s.trust.maud}): ${s.trust.maud === 3}`); G.closeDlg();
+  // day 9: a scene waits at Maud
+  while (s.day < 9) S.sleep(s); G.hud();
+  out.push(`day 9: the scene is waiting: ${!!w.Scenes.available("maud", s)}`);
+  G.talk("maud"); await sleep(60); out.push(`talking to Maud plays her scene (not the menu): ${/Sit\\.|hen after corn/.test(txt())}`);
+  for (let i = 0; i < 8; i++) { const b = btns(); if (!b.length) break; const next = b.find(x => /Next|Mm\./.test(x.textContent)) || b[0]; next.click(); await sleep(40); }
+  out.push(`the scene is marked played, trust went up (Maud ${s.trust.maud}), and it doesn't repeat: ${!!s.scenes.maud_abacus && !w.Scenes.available("maud", s) && s.trust.maud >= 4}`); G.closeDlg();
+  // Crane by the well on day 12
+  while (s.day < 12) S.sleep(s); G.tick(1 / 60); out.push(`day 12: Crane is back by the well (no ledger): ${!!w.Scenes.available("crane", s)}`);
+  // letters panel
+  s.flags.x = 1; G.hidePanel(); try { w.eval("Story"); } catch (e) {} 
+  out.push(`errors: ${JSON.stringify(errs)}`);
+ } catch (e) { out.push("EXCEPTION " + e.message); }
+  document.getElementById("out").textContent = "RESULTS\n" + out.join("\n"); document.querySelectorAll("iframe").forEach(f => f.remove());
+})();
+</script></body></html>

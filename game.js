@@ -61,9 +61,13 @@
   const plotAt = (x, y) => s.plots.find(p => p.x === x && p.y === y);
   const npcAt = (x, y) => Object.values(NPC).find(n => n.x === x && n.y === y && npcHere(n));
   const visitorOk = () => !storyOn || (Story.state.ch >= 5 && !Story.busy); // visitors wait until the story's first lessons are done
-  const npcHere = n => n.who === "crane" ? !!(window.Verbs && Verbs.craneOn) : n.who === "pell" ? visitorOk() && !s.pell && s.day >= S.R.pellDays[0] && s.day <= S.R.pellDays[1]
+  // village scenes (scenes.js) wait on certain people from certain days: the story's first lessons run first, so scenes start with chapter 5
+  const sceneOk = () => !!s && (!storyOn || (Story.state.ch >= 5 && !Story.busy));
+  const sceneFor = who => (window.Scenes && sceneOk()) ? Scenes.available(who, s) : null;
+  const cranePos = () => { if (window.Verbs && Verbs.craneOn) return [7, 7]; const sc = sceneFor("crane"); return sc && sc.at ? sc.at : null; };
+  const npcHere = n => n.who === "crane" ? (() => { const p = cranePos(); if (p) { n.x = p[0]; n.y = p[1]; } return !!p; })() : n.who === "pell" ? visitorOk() && !s.pell && s.day >= S.R.pellDays[0] && s.day <= S.R.pellDays[1]
     : n.who === "pedlar" ? visitorOk() && !s.poison && s.day >= S.R.pedlarDays[0] && s.day <= S.R.pedlarDays[1]
-    : n.who !== "duke" || s.offers.some(o => o.who === "duke") || s.orders.some(o => o.who === "duke" && o.status === "open");
+    : n.who !== "duke" || s.offers.some(o => o.who === "duke") || s.orders.some(o => o.who === "duke" && o.status === "open") || !!sceneFor("duke");
   const buildingAt = (x, y) => BUILD.find(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h);
   const blocked = (x, y) => x < 0 || y < 0 || x >= MW || y >= MH || solid.has(key(x, y)) || !!npcAt(x, y);
   // ---------- player & input ----------
@@ -310,6 +314,7 @@
   // ---------- villagers ----------
   async function talk(who) {
     if (storyOn && Story.onTalk(who)) return;
+    { const sc = sceneFor(who); if (sc) return runScene(sc); }
     if (FAIR[who]) return fairDeal(who);
     if (who === "pell") return pellTalk(); if (who === "pedlar") return pedlarTalk();
     if (who === "maud") return maud(); if (who === "ezra") return ezra(); if (who === "tomas") return tomas();
@@ -321,8 +326,7 @@
     }
     if (o) { await haggle(o, { open: o.price - 1, walk: o.reserve != null ? o.reserve : o.price, line: who === "duke" ? "His Grace makes one offer." : who === "ashby" ? "I need grain for the ovens, dear." : "Grain for the wheel. Name your price." }); return; }
     if (open) return say(who, `Still waiting on ${open.sacks} sacks, due day ${open.due}${open.late ? " (late!)" : ""}.<br>Put them in your shipping crate on the farm.`);
-    const idle = { ashby: ["Good grain makes good bread. Come by in a day or two.", "The ovens are hot and the orders keep coming."], hobb: ["The wheel turns when there's grain. I'll have work soon.", "I pay on terms, but I always pay."], duke: ["His Grace is pleased."] }[who];
-    say(who, idle[s.day % idle.length]);
+    return chat(who);
   }
   // ---------- visitors: Pell the pig farmer (grain he can't pay for) and Barnaby the pedlar (rat poison) ----------
   function depositLesson(o) { // Cash rose, Revenue didn't: the deposit is a promise of grain, so it's a liability
@@ -347,7 +351,7 @@
   }
   async function fairDeal(who) { // the market fair: a different buyer, a different price; once a day each
     const f = FAIR[who]; fairSeen[who] = f.walk;
-    if (fairDay[who] === s.day) return say(who, "I've bought my fill today. Come back tomorrow.");
+    if (fairDay[who] === s.day) return chat(who);
     const n = Math.min(f.sacks, s.sacks); if (n < 3) return say(who, `${f.line}<br>Come back with grain. (I pay up to ${f.walk} a sack.)`);
     const o = S.addOffer(s, who, n, f.walk - 1, f.terms, 0, 1);
     const deal = await haggle(o, { open: f.walk - 1, walk: f.walk, line: f.line });
@@ -421,6 +425,7 @@
       ["Sprinkler: 80 Cash", () => commit(c => S.buySprinkler(c), r => say("tomas", r.ok ? "Waters the 8 plots around it every morning, and seed planted there starts a day ahead. While it's in the field the hands save 20 a week hauling water. Set it on an empty tilled plot with plenty of neighbours: one on the edge waters fewer." : r.msg)), s.bal.cash < 80],
       ["Is a sprinkler worth it?", sprinklerAdvice],
       ...(!s.fenced && s.day <= S.R.pigDay ? [[`Fence the field: ${S.R.fenceCost} Cash`, () => commit(c => S.buyFence(c), r => say("tomas", r.ok ? "There. My pigs won't get through that. It's a cost of running the farm, so it goes in the Ledger as upkeep, not as something you own." : r.msg)), s.bal.cash < S.R.fenceCost]] : []),
+      ["Ask Tomas about…", () => chat("tomas")],
       [`Pay what I owe${s.bills.some(b => S.discNow(s, b)) ? " (2% off now)" : ""}`, () => commit(c => S.payBills(c), r => say("tomas", r.ok ? "Paid. I remember who pays on time." : r.msg)), !owed], ["Leave", null]]);
   }
   function ezra() {
@@ -429,7 +434,7 @@
     const opts = [["Borrow 50", go(c => S.borrow(c, 50)), room < 50], ["Borrow 100", go(c => S.borrow(c, 100)), room < 100], ["Repay 50", go(c => S.repay(c, 50)), !owed || s.bal.cash < Math.min(50, owed) + S.loanFacts(s, 50).fee]];
     if (owed) opts.push(["Should I repay early?", () => repayAdvice(owed)]);
     if (inv && (!storyOn || Story.state.ch >= 8)) opts.push([`Sell ${S.NAMES[inv.who]}'s invoice (${inv.amount}) for ${Math.round(inv.amount * .85)} today`, go(c => S.factor(c, inv.id))]);
-    opts.push(["Leave", null]);
+    opts.push(["Ask Ezra about…", () => chat("ezra")]); opts.push(["Leave", null]);
     const wk = Math.round(owed * t.rateBp / 10000);
     say("ezra", `Your credit: ${hearts(s.trust.ezra)}. I lend up to ${t.loanLimit} at ${t.rateBp / 100}% a week. You owe me ${owed}${owed ? `: that's ${wk} of interest every pay-day until it's repaid. Repay before day ${S.R.prepayBefore} and I charge one week's interest on what you repay.` : "."}`, opts);
   }
@@ -446,7 +451,24 @@
       `<i>${late ? "Bought this late, it's a good machine in a bad month: profit says yes, Cash says wait. " : ""}A machine is worth it when the savings over its life beat its price and your Cash can wait for them. Profit and Cash can disagree. That's the Ledger's lesson.</i>`,
       [["Back", tomas], ["Open the Ledger", ledger]]);
   }
-  function maud() { const c = S.coach(s); say("maud", c ? c.text : "Nothing to add. The books look sound to me."); }
+  function maud() { const c = S.coach(s); if (!c) return chat("maud"); say("maud", c.text, [["Ask about something else", () => chat("maud")], ["Close", null]]); }
+  // ---------- people: a line from them, then "Ask about..." (some answers are locked until they trust you) ----------
+  async function chat(who) {
+    s.heard = s.heard || {}; const tp = Cast.topics(who, s), locked = Cast.locked(who, s);
+    const k = await sayP(who, Cast.greet(who, s), tp.map(t => t.label + (t.heard ? " (again)" : "")).concat(["Leave"]));
+    if (k >= tp.length) return; const t = tp[k], key = who + ":" + t.id;
+    for (const ln of t.lines) await sayP(who, ln, ["Next"]);
+    if (!s.heard[key]) { s.heard[key] = s.day; if (s.trust[who] != null && s.trust[who] < 10) { s.trust[who]++; toast(`${Cast.name(who).split(",")[0]} trusts you a little more ♥`); FX.sfx("good"); } }
+    if (locked && !tp.some(x => !x.heard) ) toast("There's more they'd say, with time."); return chat(who);
+  }
+  async function runScene(sc) { // an optional village scene: marked done first (a reload mid-scene never replays it), then played
+    s.scenes[sc.id] = s.day; s.flags = s.flags || {};
+    const c = { s, S, lines: async (who, arr) => { for (const t of arr) await sayP(who, t, ["Next"]); }, ask: (who, text, labels) => sayP(who, text, labels),
+      maud: text => sayP("maud", text, ["Mm."]), flag: (k, v) => { s.flags[k] = v; }, clue: () => { s.clues = (s.clues || 0) + 1; toast(`A clue: ${s.clues} of ${Scenes.CLUES}`); },
+      trust: (who, d) => { if (s.trust[who] != null) s.trust[who] = Math.max(0, Math.min(10, s.trust[who] + d)); if (d > 0) toast(`${Cast.name(who).split(",")[0]} trusts you more ♥`); },
+      letter: async i => { if (storyOn) await Story.letter(i); else await page(Story.PAGES[i], Story.LETTERS[i]); } };
+    try { await sc.run(c); } finally { hud(); save(); }
+  }
   function crate() {
     const opts = S.openOrders(s).sort((a, b) => a.due - b.due).map(o => [`Ship ${o.sacks} to ${S.NAMES[o.who]} (due day ${o.due})`,
       () => { const r = act(() => S.deliver(s, o.id)); if (r.ok) { FX.sfx("ship"); floatAt(CRATE.x, CRATE.y - 1, `Sold: ${o.value}`, "#2a5a2a"); story("deliver", o); } else say(null, r.msg); }, s.sacks < o.sacks]);
@@ -458,8 +480,12 @@
     atDesk = true; hud();
     const c = S.coach(s);
     dlg({ who: null, text: `Your desk: Edric's ledger, the forecast board, Maud's notebook.${c && c.danger ? `<br><b>Maud's note:</b> ${c.text}` : ""}`,
-      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", "Back to the road"] })
-      .then(r => { const f = [sleepNow, ledger, ledgerTour, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, () => { atDesk = false; hud(); }][r.i]; f && f(); });
+      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, "Back to the road"] })
+      .then(r => { const f = [sleepNow, ledger, ledgerTour, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, letters, () => { atDesk = false; hud(); }][r.i]; f && f(); });
+  }
+  function letters() { // every letter of Edric's you've found, newest first, to read again
+    const st = storyOn ? Story.state : { pages: [] }, ids = st.pages.slice().sort((a, b) => b - a);
+    showPanel("letters", `<h1>Edric's letters <span class="hint">${ids.length} of ${Story.LETTERS.length} found</span></h1>` + (ids.map(i => `<div class="journal small"><b>${Story.LETTERS[i]}</b><p>${Story.PAGES[i]}</p><p class="sig">— E.</p></div>`).join("") || "<p class='hint'>None yet. Edric left them where the lessons are.</p>"));
   }
   function plan() {
     const o = S.openOrders(s), need = S.committed(s) - s.sacks - S.sacksComing(s);
@@ -496,11 +522,11 @@
     });
   }
   // ---------- Edric's journal pages and Maud's notebook ----------
-  function page(text) { return new Promise(res => { showPanel("page", `<div class="journal"><div class="hint">A page from Uncle Edric's journal</div><p>${text}</p><p class="sig">— E.</p></div><button class="btn gold" id="pgok">Keep it</button>`); $("pgok").onclick = () => { hidePanel(); res(); }; }); }
+  function page(text, title) { return new Promise(res => { FX.sfx("chime"); showPanel("page", `<div class="journal"><div class="hint">${title ? `Edric's letter: ${title}` : "A page from Uncle Edric's journal"}</div><p>${text}</p><p class="sig">— E.</p></div><button class="btn gold" id="pgok">Keep it</button>`); $("pgok").onclick = () => { hidePanel(); res(); }; }); }
   function notebook() {
     if (panelKind && panelKind.k === "notebook") return hidePanel(); const st = storyOn ? Story.state : { notebook: [], pages: [] };
     showPanel("notebook", `<h1>Maud's notebook <span class="hint">click Close, or press N or Esc</span></h1>` + (st.notebook.map(n => `<div class="nb"><b>${n.term}</b><div>${n.line}</div><div class="hint">Your example: ${n.example}</div></div>`).join("") || "<p class='hint'>Empty for now. Maud writes in it as you learn.</p>") +
-      (st.pages.length ? `<h3>Edric's journal</h3>` + st.pages.slice().sort().map(i => `<p class="journal small">${Story.PAGES[i]}</p>`).join("") : ""));
+      (st.pages.length ? `<h3>Edric's letters</h3>` + st.pages.slice().sort().map(i => `<p class="journal small"><b>${Story.LETTERS[i]}.</b> ${Story.PAGES[i]}</p>`).join("") : ""));
   }
   function transcript() { if (panelKind && panelKind.k === "transcript") return hidePanel(); showPanel("transcript", TR.html() + `<p class="hint">Click Close, or press T or Esc.</p>`); }
   // ---------- the night ----------
@@ -607,7 +633,7 @@
   // Mouse-only play: every panel you can leave gets a clickable Close at the top and bottom, and a click on
   // the dark backdrop closes it. Task panels (forecast with cells to fill, journal pages, the close) keep
   // their own buttons, because they finish a step of the story.
-  const CLOSABLE = new Set(["plan", "ledger", "notebook", "transcript", "explain"]);
+  const CLOSABLE = new Set(["plan", "ledger", "notebook", "transcript", "explain", "letters"]);
   function showPanel(k, html, locked) {
     panelKind = { k, locked }; FX.sfx("page");
     const x = CLOSABLE.has(k) && !locked;
@@ -726,7 +752,7 @@
   }
   function drawPerson(who, x, y, dir, moving, stepv) { const f = A.people[who][dir], i = moving ? 1 + (Math.floor(stepv) % 2) : 0;
     ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.fillRect(Math.round(x - 5 - cam.x), Math.round(y - 1 - cam.y), 10, 3); blit(f[i], x - 8, y - 16); }
-  const wants = who => storyOn ? ({ tomas: ["tomas2", "tomas6"], ashby: ["ashby3"], hobb: ["hobb4"], ezra: ["ezra7"], duke: ["duke8"] }[who] || []).indexOf(Story.state.stage) >= 0 : s.offers.some(o => o.who === who);
+  const wants = who => !!sceneFor(who) || (storyOn ? ({ tomas: ["tomas2", "tomas6"], ashby: ["ashby3"], hobb: ["hobb4"], ezra: ["ezra7"], duke: ["duke8"] }[who] || []).indexOf(Story.state.stage) >= 0 : s.offers.some(o => o.who === who));
   function draw() {
     cam.x = Math.max(0, Math.min(MW * T - VW, pl.x - VW / 2)); cam.y = Math.max(0, Math.min(MH * T - VH, pl.y - VH / 2));
     ctx.fillStyle = "#79b851"; ctx.fillRect(0, 0, VW, VH); drawGround();

@@ -4,6 +4,14 @@ All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added: story, cast and letters
+- **A cast with a spine** (`cast.js`, `docs/STORY-BIBLE.md`): every villager has a look, a verbal habit, a mantra, a want and a secret, and a greeting pool that responds to the weather and the chest. Walk up to anyone with no business and they speak, then offer "Ask about..." topics, some locked until you have earned their trust (hearts) or the story has reached them.
+- **The mystery**: why a profitable farm went broke, and who wanted it to. Edric stood surety for Ashby's bakery (a guarantee the Ledger never showed), the Crown sold the note to **Steward Vane**, and Vane is buying up every note in the valley to call them in at Midwinter. The Duke's order is his gambit.
+- **12 village scenes** (`scenes.js`, days 9-28): optional, one-time, marked by a red "!" on the speaker. A scene IS a lesson: Hobb's request for seven more days is a real credit decision (it changes his invoice); Vane's "partnership" is a payable-on-demand covenant. Six clues, flags saved for Summer.
+- **Edric's nine letters** (from five): found where the lessons are, reread from the desk ("Edric's letters"); the last turns the season into a mystery.
+- Chapter dialogue rewritten in each character's voice (Crane's forty-one items, Tomas's patter, Ashby's "none of his luck", Hobb's pauses, Ezra's price-not-judgement, Vane's opportunity). "The Duke's steward" is now **Steward Vane**.
+- `tests/test-cast.js` (every line fits a dialogue box and has no placeholders, greetings vary and respond, topics are earned, every scene plays through every choice keeping the books balanced, the clue count matches), `tests/story-ui.html`.
+
 ### Added: sound and music
 - **Score** (`music.js`): a small generative composer in six moods (farm, town waltz, rain, night lullaby, tense, the bailiff's march), all synthesized with WebAudio, so no audio files and it works offline. The score follows the game: the bailiff's march in chapter 1, night music while you sleep, rain on rainy days, the town waltz east of the village square, a heartbeat when the chest can't cover the next pay-day or the Duke's order is open.
 - **24 sound effects** (`fx.js`): footsteps, tilling, planting, watering, harvest, shipping, page turns, button taps, error buzz, stamp, sleep and morning, mastery chime, rain, and more. Each character has their own typewriter voice (pitch and timbre).

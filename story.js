@@ -8,12 +8,18 @@ window.Story = (function () {
   const S = Spring, B = Books, TR = Transcript;
   let G, st = fresh();
   const TITLES = ["", "The bailiff", "Harvest and the bakery", "First seed", "Hobb pays later", "Wages day", "Tomas's terms", "Ezra", "The Duke's steward", "Closing the books"];
+  // Edric's letters: his voice is warm, rueful and a little funny; each one answers a question the player has just started to ask, and the last turns it into a mystery.
+  const LETTERS = ["The first page", "Hobb's best customer", "Maud's calendars", "The Duke's grain", "The last page", "On the bailiff", "Bram's oven", "On patience", "The thing I signed"];
   const PAGES = [
     "Spring. Best harvest in ten years. Sold every sack. So why is the chest always empty?",
     "Hobb's my best customer. Pays like clockwork, fourteen days after. I'll be fine till then.",
-    "Maud keeps drawing me calendars of coin. I keep telling her: the Ledger shows a profit.",
-    "The Duke wants grain, more than I've ever grown. Ezra will lend me the seed money. It's the making of us.",
+    "Maud keeps drawing me calendars of coin. I keep telling her: the Ledger shows a profit. She keeps looking at me the way you look at a man standing on a frozen pond, saying the ice is fine.",
+    "The Duke wants grain, more than I've ever grown. Ezra will lend me the seed money. It's the making of us. The steward says growth is the only safe harbour. He smiles a great deal. I should have counted his teeth.",
     "Profit every year. Never once enough coin on wages day. If someone reads this: watch the chest, not the Ledger.",
+    "If you are reading this, Crane has found you first. Be civil. He is the only man in the Duke's employ who counts everything twice, and that is a rarer virtue than honesty. He will frighten you. He is frightened of nearly everything, which is why he is so careful.",
+    "Ashby would not take my money. Not a coin. So I gave her my name instead. A name is cheaper than money, I thought. I have since learned what it costs.",
+    "Ezra never lied to me. That was the trouble. His rate was always exactly what I deserved. Ask him about patience, and then ask yourself who you were being patient with.",
+    "I signed a paper I ought to have shown Maud. It is in the drawer with the seal I could not read. Ask Crane to read it. Ask Ezra whose name stands beneath mine. And please, whatever you do, do not let Ashby thank you for it.",
   ];
   function fresh() { return { ch: 1, stage: "intro", notebook: [], pages: [] }; }
   function init(g, saved) { G = g; st = saved || fresh(); goal(); }
@@ -36,7 +42,7 @@ window.Story = (function () {
   })[st.stage] || "";
   function goal() { G.goal(goalText(), st.ch); }
   function to(ch, stage) { if (window.Verbs) Verbs.parchClose(); /* a lesson page never outlives its stage */ st.ch = ch; st.stage = stage; G.s.quiet = ch <= 4; goal(); G.save(); }
-  async function page(i) { if (st.pages.indexOf(i) < 0) st.pages.push(i); await G.page(PAGES[i]); }
+  async function page(i) { if (st.pages.indexOf(i) < 0) st.pages.push(i); await G.page(PAGES[i], LETTERS[i]); }
   function addEx(id, more) { const n = st.notebook.find(x => x.id === id); if (n) n.example += " " + more; }
   function keep(id, term, line, example) { if (!st.notebook.some(n => n.id === id)) st.notebook.push({ id, term, line, example }); G.toast(`Maud's notebook: ${term} (N)`); }
   const tell = (t, spot) => G.say("maud", t, null, spot);
@@ -55,7 +61,7 @@ window.Story = (function () {
   async function ch1() {
     const V = Verbs, W = G.world, b = S.balanceSheet(G.s.bal), s0 = G.s, cost = S.R.unitCost;
     V.parchReset(); V.craneOn = true;
-    await G.say("crane", "Edric's heir. The Crown sent me to list what's yours before Midwinter. Walk with me.", ["Walk with you"]);
+    await G.say("crane", "Edric's heir. Bailiff Crane, of the Crown. I am here to list what is yours before Midwinter. There are forty-one items on my list. I shall be thorough. Walk with me.", ["Walk with you"]);
     const sackVal = s0.sacks * cost, cropPlots = () => s0.plots.filter(p => p.crop), cropVal = cropPlots().reduce((a, p) => a + p.crop.cost, 0);
     G.toast("Crane taps the chest: Cash.");
     const tagging = V.tag({
@@ -75,7 +81,7 @@ window.Story = (function () {
     V.remark("Find the rest. Everything this farm owns.");
     await tagging;
     await V.countTotal("aTot", s0.bal.cash + sackVal + cropVal);
-    await G.say("crane", "Good. Now what it owes. I brought the papers myself.", ["Show me"]);
+    await G.say("crane", "Good. Now the other column, the one people prefer not to read. I brought the papers myself.", ["Show me"]);
     V.pinRow("liab", "Ezra's note (the loan)", b.loan); await V.wait(window.__fastVerbs ? 0 : 700);
     V.pinRow("liab", "The Crown's writ, due at Midwinter", b.crown); await V.wait(window.__fastVerbs ? 0 : 500);
     await V.countTotal("lTot", b.liab);
@@ -83,9 +89,10 @@ window.Story = (function () {
     V.P.eq = b.equity; V.parch();
     await V.stamp(`Owner's equity ${V.fmt(b.equity)}`, `${b.assets.toLocaleString("en-US")} owned − ${b.liab.toLocaleString("en-US")} owed`);
     const right = (c === 1) === (b.equity < 0);
-    await G.say("crane", right ? "You've a head for it. Pity." : "Less. Much less.", ["Next"]);
+    await G.say("crane", right ? "You've a head for it. That is not a compliment, heir. It is a diagnosis." : "Less. Much less. I am sorry. I am required to say it plainly.", ["Next"]);
     V.craneOn = false; document.querySelectorAll(".vstamp").forEach(x => x.remove());
-    await tell(`Don't mind Crane. What you own minus what you owe is yours, and yours is ${b.equity < 0 ? "below zero" : "thin"}. That's why we work.`);
+    await tell(`That was Crane. Don't mind him: he counts everything twice because he's frightened of nearly everything. What you own minus what you owe is yours, and yours is ${b.equity < 0 ? "below zero" : "thin"}. That's why we work.`);
+    await page(5);
     await tell("The far field's ripe. Harvest it (walk up, press E or tap Act) and Ashby the baker will buy.");
     if (right) mastered("equation");
     keep("equation", "Assets = Liabilities + Owner's equity", "What you own, minus what you owe, is yours. It can be below zero.", `Day 1: ${b.assets} = ${b.liab} + (${b.equity}).${right ? "" : " You guessed more; the page says less."}`);
@@ -94,7 +101,7 @@ window.Story = (function () {
   // ---------- chapter 3: first seed (C1.04: cost becomes inventory, not an expense yet) — WS3: no typed question; Maud says one line ----------
   async function ch2() {
     const sc = S.R.seedCost, per = S.R.sacksPerPlot;
-    await G.say("tomas", `Seed is ${sc} a packet. One packet plants one plot; a plot gives ${per} sacks of wheat.`);
+    await G.say("tomas", `My friend! Edric's heir! Sit, sit, no, don't sit, buy! Seed is ${sc} a packet. One packet plants one plot; a plot gives ${per} sacks of wheat. I wouldn't say that if it weren't true, and I would say it if it were, which is a rare quality in a salesman.`);
     await tell("Let me buy the first three, so you can see where the coin goes.");
     G.act(() => S.buySeeds(G.s, 3, false));
     await tell(`Cash went down ${3 * sc}. Inventory went up ${3 * sc}. Changed shape, not spent.<br>Seed only becomes a cost when the grain is sold.`, ["h-cash", "h-inv"]);
@@ -108,7 +115,7 @@ window.Story = (function () {
   async function ch3() {
     const cost = S.R.unitCost, pct = p => Math.round((p - cost) / p * 100);
     const o = G.s.offers.find(x => x.who === "ashby") || S.addOffer(G.s, "ashby", 6, 7, 0, 4, 4); S.setPrice(G.s, o.id, 7);
-    await G.say("ashby", "So you're Edric's heir. I need 6 sacks for the ovens. I'll give you 7 a sack, Cash.");
+    await G.say("ashby", "So you're Edric's heir. You've his chin and none of his luck, dear. I need six sacks for the ovens. Seven a sack, Cash on the nail.");
     await tell(`Each sack cost you ${cost}: ${S.R.seedCost} of seed for ${S.R.sacksPerPlot} sacks. At 7 you keep ${7 - cost} a sack. That's gross profit.<br>${7 - cost} out of every 7 is ${pct(7)}%: your margin.`, ["h-inv"]);
     // The worked example goes in the notebook as it's shown, so the Try that follows can point to it.
     keep("margin", "Gross profit & margin", "Price minus cost per sack is gross profit. Divide by the price: margin. Never go below your floor (your cost per sack).", `Maud at 7: 7 − ${cost} = ${7 - cost} profit a sack; ${7 - cost} ÷ 7 = ${pct(7)}% margin.`);
@@ -129,7 +136,7 @@ window.Story = (function () {
   async function ch4() {
     const o = G.s.offers.find(x => x.who === "hobb") || S.addOffer(G.s, "hobb", 9, 9, 14, 5, 4); S.setPrice(G.s, o.id, 9);
     await tell("Before you go in: know your floor price. And listen for when he pays.");
-    await G.say("hobb", `Edric's heir! Nine sacks. I pay 14 days after delivery, same as always.`);
+    await G.say("hobb", `...Edric's heir. Hm. Nine sacks. I pay... fourteen days after delivery. Same as always. Same as your uncle.`);
     await tell("Your uncle loved Hobb. Hobb always paid. Eventually.");
     const deal = await G.haggle(o, { open: 8, walk: 9, floor: S.R.unitCost, line: "Nine sacks. Name your price; I'm not a charity." });
     if (!deal) { await G.say("hobb", "Suit yourself. The offer stands till tomorrow."); return; }
@@ -188,7 +195,7 @@ window.Story = (function () {
   // ---------- chapter 7: Ezra (C1.06, C5.01: debt, interest, what lenders read) ----------
   async function ch7() {
     const t0 = S.terms(G.s);
-    await G.say("ezra", `You want coin. Everyone does. My rate is ${t0.rateBp / 100}% a week. Show me your forecast first, and I'll see.`);
+    await G.say("ezra", `Come in. Sit. You want coin; everyone does, eventually. My rate is ${t0.rateBp / 100}% a week. It is not a judgement, only a price. Show me your forecast first, and I shall see how much I believe it.`);
     const r = await Verbs.timeline({ mode: "predict", n: 14, tol: 5, title: "Your forecast, for Ezra", maud: "Ezra: tell me your lowest coin in the next two weeks, and the day. Get both right (the coin within 5) and I will shave my rate." });
     G.s.rateAdj = Math.min(100, 50 * ((r.okLow ? 1 : 0) + (r.okDay ? 1 : 0))); const t = S.terms(G.s);
     if (r.okLow && r.okDay) { mastered("tvm"); mastered("wc"); } // right = the lowest coin (within 5) and the day
@@ -203,14 +210,14 @@ window.Story = (function () {
   async function ch8() {
     const o = G.s.offers.find(x => x.who === "duke"); if (!o) { to(9, "run9"); return; }
     const D = S.R.duke, half = Math.round(D.sacks / 6) * 3;
-    await G.say("duke", `His Grace orders ${D.sacks} sacks at ${D.price}: ${(D.sacks * D.price).toLocaleString("en-US")} of Revenue. Due in ${D.dueIn} days; he pays ${D.terms} days after delivery.`);
+    await G.say("duke", `Heir! Steward Vane, at the Duke's service, and yours. I bring the kind of opportunity that does not knock twice. His Grace orders ${D.sacks} sacks at ${D.price}: ${(D.sacks * D.price).toLocaleString("en-US")} of Revenue. Due in ${D.dueIn} days; he pays ${D.terms} days after delivery. Think what it could do for Thornfield.`);
     await page(3);
-    await tell("This is the order that killed your uncle. I won't tell you what to do. I'll ask.");
+    await tell("This is the order that killed your uncle. The steward calls it an opportunity. I call it a loan you make him, at no interest, in your own seed. I won't tell you what to do. I'll ask.");
     const need = Math.max(0, Math.ceil((D.sacks + S.committed(G.s) - G.s.sacks - S.sacksComing(G.s)) / 3) - G.s.seeds), extra = need * 12;
     const f = S.forecast(G.s, 14, extra), low = f.reduce((a, x) => x.close < a.close ? x : a);
     await G.board({ title: `What if: you take it and buy ${need} packets of seed today (${extra})`, show: 14, fill: [], extra, maud: "Read your own board. Then answer me." });
     await ask("If you take it and buy the seed today, what's the lowest Cash in the next two weeks?", low.close, ["Look down the closing Cash column for the smallest number.", "A minus sign means the chest is empty before then."], null, 0, [{ label: "Open the what-if forecast", open: () => G.board({ title: `What if: you take it and buy ${need} packets of seed today (${extra})`, show: 14, fill: [], extra }) }], `Going down the closing Cash column, the smallest number is ${low.close}, on day ${low.day}.`, "Open the forecast and read down the Closing Cash column. The smallest number is your lowest point; a minus number is smaller than any plus.");
-    const c = await G.say("duke", "Well? His Grace doesn't wait.", [`Take all ${D.sacks}`, `Offer ${half} (half)`, "Decline"]);
+    const c = await G.say("duke", "Well? Opportunities are like bread, heir. Best taken warm.", [`Take all ${D.sacks}`, `Offer ${half} (half)`, "Decline"]);
     if (c === 1) { S.addOffer(G.s, "duke", half, D.price, D.terms, D.dueIn, 4); S.decline(G.s, o.id); G.act(() => S.accept(G.s, G.s.offers.find(x => x.who === "duke").id)); }
     else if (c === 0) G.act(() => S.accept(G.s, o.id)); else S.decline(G.s, o.id);
     const wise = low.close >= 0 ? true : c > 0;
@@ -259,8 +266,8 @@ window.Story = (function () {
     if (evt === "deliver" && st.stage === "ship4" && info.who === "hobb") run(ch4b, info);
     if (evt === "morning" && st.stage === "sleep5" && G.s.day >= 8) run(async () => { await ch5(); await revealIfDue(); });
     else if (evt === "morning" && G.s.bet && G.s.day >= G.s.bet.revealDay) run(revealIfDue);
-    if (evt === "morning" && st.stage === "sleep8") run(async () => { ch8arrive(); await tell("The Duke's steward is in the square. He's asking for you by name."); });
+    if (evt === "morning" && st.stage === "sleep8") run(async () => { ch8arrive(); await tell("Steward Vane is in the square, in a grey cloak and gloves on a warm day. He's asking for you by name. Mind his smile: it is paid for by someone."); });
   }
   const quietOffers = () => st && st.ch <= 4; // no stray orders while the first lessons run
-  return { init, start, onTalk, after, close, quietOffers, goalTexts: goalText, get state() { return st; }, get busy() { return busy; }, TITLES, PAGES, fresh };
+  return { init, start, onTalk, after, close, quietOffers, letter: page, LETTERS, goalTexts: goalText, get state() { return st; }, get busy() { return busy; }, TITLES, PAGES, fresh };
 })();
