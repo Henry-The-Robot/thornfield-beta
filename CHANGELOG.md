@@ -1,5 +1,11 @@
 # Changelog
 
+## Practice: Maud's problem (stacked on the story PR)
+- A new problem every day, set by Maud on your own live numbers (gross margin on your last sale, the equation, inventory, receivables, interest, Cash at the next pay-day, the discount, break-even, current ratio, operating income, deposits, the Crown fund). Desk menu or talk to Maud.
+- Every third day, with two offers on the table, she asks which puts more Cash in the chest by day 28.
+- Right on your own = transcript evidence (mastery needs several days), a streak, and favour (Maud trusts you more). Hinted or walked-through = no credit.
+- Tests: `test-practice.js` (1100+ generated problems checked against the engine), `practice-ui.html`.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]

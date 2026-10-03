@@ -451,7 +451,21 @@
       `<i>${late ? "Bought this late, it's a good machine in a bad month: profit says yes, Cash says wait. " : ""}A machine is worth it when the savings over its life beat its price and your Cash can wait for them. Profit and Cash can disagree. That's the Ledger's lesson.</i>`,
       [["Back", tomas], ["Open the Ledger", ledger]]);
   }
-  function maud() { const c = S.coach(s); if (!c) return chat("maud"); say("maud", c.text, [["Ask about something else", () => chat("maud")], ["Close", null]]); }
+  function maud() { const c = S.coach(s), has = !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
+    say("maud", c ? c.text : Cast.greet("maud", s), opts); }
+  // ---------- practice: one small problem a day on your own numbers (practice.js). A right answer on your own is evidence in the transcript; a walk-through is not. ----------
+  async function problem() {
+    if (s.practice && s.practice.done[s.day]) return say("maud", "That's today's. Come back tomorrow; the numbers will have moved.");
+    const cmp = s.day >= 3 && s.offers.length >= 2 && (s.day % 3 === 0) ? Practice.compare(s) : null, p = cmp || Practice.available(s, TR.state);
+    if (!p) return say("maud", "Nothing worth asking today. Your books are quiet.");
+    window.__walked = false; let right = true;
+    if (cmp) { const r = (await dlg({ who: "maud", text: p.text, choices: ["A", "B", "The same"] })).i; right = r === p.answer; if (!right) { await sayP("maud", `Not quite. ${p.work}`, ["I see"]); } }
+    else { await ask("maud", p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; }
+    const q = Practice.record(s, p, right, !right);
+    if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust.maud != null && q.favour % 2 === 0 && s.trust.maud < 10) s.trust.maud++; toast(q.streak > 1 ? `${q.streak} days running ★` : "Maud nods."); }
+    else toast("We'll come back to this one.");
+    hud(); save(); drainUses();
+  }
   // ---------- people: a line from them, then "Ask about..." (some answers are locked until they trust you) ----------
   async function chat(who) {
     s.heard = s.heard || {}; const tp = Cast.topics(who, s), locked = Cast.locked(who, s);
@@ -480,8 +494,8 @@
     atDesk = true; hud();
     const c = S.coach(s);
     dlg({ who: null, text: `Your desk: Edric's ledger, the forecast board, Maud's notebook.${c && c.danger ? `<br><b>Maud's note:</b> ${c.text}` : ""}`,
-      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, "Back to the road"] })
-      .then(r => { const f = [sleepNow, ledger, ledgerTour, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, letters, () => { atDesk = false; hud(); }][r.i]; f && f(); });
+      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", Practice.available(s, TR.state) ? "Maud's problem (new)" : "Maud's problem (done today)", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, "Back to the road"] })
+      .then(r => { const f = [sleepNow, ledger, ledgerTour, problem, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, letters, () => { atDesk = false; hud(); }][r.i]; f && f(); });
   }
   function letters() { // every letter of Edric's you've found, newest first, to read again
     const st = storyOn ? Story.state : { pages: [] }, ids = st.pages.slice().sort((a, b) => b - a);

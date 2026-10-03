@@ -1,0 +1,69 @@
+// Ledger & Crown — practice. Maud sets one small problem a day on the player's OWN books (a number you can find in the Ledger, the forecast or a live offer), and when two
+// offers are on the table she asks which one really puts more Cash in the chest. Practising on different days is the only way to turn "introduced" into "mastered", so each
+// right answer on your own is recorded as evidence in the transcript (and a hint or a walk-through isn't). A right answer also earns a favour; favours unlock the parts of
+// Maud's story she keeps back. Pure functions of the game state: nothing here posts to the books, and every answer is computed from the same engine the game runs on.
+window.Practice = (function () {
+  const S = typeof Spring !== "undefined" ? Spring : window.Spring, B = typeof Books !== "undefined" ? Books : window.Books;
+  const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) >>> 0; return h; };
+  const r1 = x => Math.round(x * 10) / 10, pct = x => Math.round(x * 100), fmtList = a => a.join(", ");
+  const lastSale = s => { for (let i = s.journal.length - 1; i >= 0; i--) { const j = s.journal[i]; if (j.type === "sale" && j.lines.revenue < 0) { const k = s.journal[i + 1]; if (k && k.type === "cogs") return { rev: -j.lines.revenue, cost: k.lines.cogs, sacks: k.lines.cogs / S.R.unitCost, who: j.memo }; } } return null; };
+  const nextPayday = s => { const d = S.nextWeekEnd(s); return d >= s.day ? d : null; };
+  // ---- the bank: each returns a problem or null when it doesn't apply today. answer is a number; tol the allowed slack.
+  const BANK = [
+    { id: "gross", concept: "gross", make: s => { const l = lastSale(s); if (!l || l.rev <= 0) return null;
+        return { text: `Your last sale brought in <b>${l.rev}</b> and the grain in it cost you <b>${l.cost}</b>. What's your gross margin, in %?`, answer: pct((l.rev - l.cost) / l.rev), tol: 1, hints: ["Gross profit is Revenue minus the cost of what you sold.", "Margin divides that profit by the price (the Revenue), not by the cost."], work: `(${l.rev} − ${l.cost}) ÷ ${l.rev} = ${r1((l.rev - l.cost) / l.rev)}, so ${pct((l.rev - l.cost) / l.rev)}%.`, docs: ["ledger"] }; } },
+    { id: "markup", concept: "margin", make: s => { const p = S.marketPrice(s.day), c = S.R.unitCost; return { text: `A sack costs you <b>${c}</b>, and today the going price is <b>${p}</b>. What's your <b>markup</b> on a sack, in %?`, answer: pct((p - c) / c), tol: 1,
+        hints: ["Markup divides the profit by what the sack cost you.", "Not the price: that would be the margin."], work: `Profit ${p} − ${c} = ${p - c}; ${p - c} ÷ ${c} = ${r1((p - c) / c)}, so ${pct((p - c) / c)}%. (Margin would be ${pct((p - c) / p)}%.)`, docs: [] }; } },
+    { id: "equation", concept: "equation", make: s => { const b = S.balanceSheet(s.bal); return { text: `Your Total assets are <b>${b.assets}</b> and your Total liabilities are <b>${b.liab}</b>. What's Owner's equity?`, answer: b.equity, tol: 0,
+        hints: ["Assets = Liabilities + Owner's equity. Rearrange it.", "Equity can be negative."], work: `${b.assets} − ${b.liab} = ${b.equity}.`, docs: ["ledger"] }; } },
+    { id: "inventory", concept: "inventory", make: s => { const b = S.balanceSheet(s.bal), g = s.plots.filter(p => p.crop).length; return { text: `You hold <b>${s.sacks}</b> sacks (cost ${S.R.unitCost} each), <b>${s.seeds}</b> packets of seed (${S.R.seedCost} each) and <b>${g}</b> plots growing (${S.R.seedCost} each, at cost). What's your Inventory?`, answer: b.inv, tol: 0,
+        hints: ["Everything you've paid for and not yet sold, at what it cost you.", "Sacks × 4, plus packets × 12, plus growing plots × 12."], work: `${s.sacks}×${S.R.unitCost} + ${s.seeds}×${S.R.seedCost} + ${g}×${S.R.seedCost} = ${b.inv}.`, docs: ["ledger"] }; } },
+    { id: "ar", concept: "ar", make: s => { const inv = s.invoices.slice().sort((a, b) => a.due - b.due); if (!inv.length) return null; const total = inv.reduce((a, v) => a + v.amount, 0);
+        return { text: `Customers owe you: ${fmtList(inv.map(v => `${S.NAMES[v.who].split(" ")[0]} ${v.amount} (due day ${v.due})`))}. What's your Accounts receivable?`, answer: total, tol: 0, hints: ["Add up everything customers still owe you.", "It's an asset: earned, but not in the chest yet."], work: `${inv.map(v => v.amount).join(" + ")} = ${total}.`, docs: ["ledger"] }; } },
+    { id: "interest", concept: "tvm", make: s => { const t = S.terms(s), l = -s.bal.loan; if (l <= 0) return null; const w = Math.round(l * t.rateBp / 10000);
+        return { text: `You owe Ezra <b>${l}</b> at <b>${t.rateBp / 100}%</b> a week. How much interest do you pay at the next pay-day?`, answer: w, tol: 0, hints: ["Interest = the loan × the weekly rate.", `${t.rateBp / 100}% is ${t.rateBp / 100} per hundred.`], work: `${l} × ${t.rateBp / 100}% = ${l * t.rateBp / 10000}, which rounds to ${w}.`, docs: [] }; } },
+    { id: "payday", concept: "wc", make: s => { const d = nextPayday(s); if (d == null || d - s.day > 6) return null; const rows = S.forecast(s, d - s.day + 1); if (!rows.length) return null;
+        const cin = rows.reduce((a, r) => a + r.cin, 0), cout = rows.reduce((a, r) => a + r.cout, 0), close = rows[rows.length - 1].close;
+        return { text: `Cash is <b>${s.bal.cash}</b>. Between now and the end of day <b>${d}</b>, <b>${cin}</b> comes in and <b>${cout}</b> goes out (wages, interest, bills). If you do nothing else, what's your Cash at the end of day ${d}?`,
+          answer: close, tol: 0, hints: ["Start with today's Cash, add what comes in, take away what goes out.", "The forecast board has the same numbers, day by day."], work: `${s.bal.cash} + ${cin} − ${cout} = ${close}.`, docs: ["forecast"] }; } },
+    { id: "discount", concept: "ap", make: s => { const b = s.bills.find(x => S.discNow(s, x) > 0); if (!b) return null; const d = S.discNow(s, b);
+        return { text: `Tomas's bill is <b>${b.amount}</b>, with <b>2%</b> off if you pay by day ${b.discBy}. It's day ${s.day}. How much Cash do you pay him if you pay now?`, answer: b.amount - d, tol: 0, hints: ["2% of the bill comes off.", "Round to a whole coin."], work: `${b.amount} − ${d} = ${b.amount - d}.`, docs: [] }; } },
+    { id: "depreciation", concept: "depreciation", make: s => { if (s.bal.equip <= 0) return null; return { text: `A sprinkler cost <b>${S.R.sprinklerCost}</b> and is expected to last <b>${S.R.sprinklerCost / S.R.depPerWeek} weeks</b>. How much Depreciation does it add to your costs each week?`, answer: S.R.depPerWeek, tol: 0,
+        hints: ["Spread the cost evenly over its life.", "Cost ÷ weeks of life."], work: `${S.R.sprinklerCost} ÷ ${S.R.sprinklerCost / S.R.depPerWeek} = ${S.R.depPerWeek} a week.`, docs: [] }; } },
+    { id: "breakeven", concept: "breakeven", make: s => { const p = S.marketPrice(s.day), g = p - S.R.unitCost, w = Math.max(S.R.wageFloor, S.R.upkeep - S.R.sprinklerSaving * s.plots.filter(q => q.sprinkler).length); if (g <= 0) return null;
+        return { text: `Wages are <b>${w}</b> a week. Each sack sold at today's <b>${p}</b> earns <b>${g}</b> of gross profit. How many sacks a week just to cover the wages?`, answer: Math.ceil(w / g), tol: 0, hints: ["Wages ÷ gross profit per sack.", "Round up: half a sack doesn't pay anyone."], work: `${w} ÷ ${g} = ${r1(w / g)}, so ${Math.ceil(w / g)} sacks.`, docs: [] }; } },
+    { id: "ratio", concept: "ratios", make: s => { const b = S.balanceSheet(s.bal); if (b.currentLiab <= 0) return null; const r = r1(b.currentAssets / b.currentLiab);
+        return { text: `Your current assets (Cash, receivables, Inventory) are <b>${b.currentAssets}</b>. Your current liabilities (payables, the loan, the Crown, deposits) are <b>${b.currentLiab}</b>. What's your current ratio, to one decimal?`, answer: r, tol: .05, hints: ["Current assets ÷ current liabilities.", "Under 1.0 means you owe more soon than you hold."], work: `${b.currentAssets} ÷ ${b.currentLiab} = ${r}.`, docs: ["ledger"] }; } },
+    { id: "operating", concept: "operating", make: s => { const st = B.close(s); if (st.is.revenue <= 0) return null; const i = st.is;
+        return { text: `So far this spring your Gross profit is <b>${i.gross}</b> and your operating expenses (wages, depreciation, forfeits, losses) are <b>${i.opex}</b>. What's your Operating income?`, answer: i.operating, tol: 0, hints: ["Gross profit minus operating expenses.", "Interest comes after: it isn't in this one."], work: `${i.gross} − ${i.opex} = ${i.operating}.`, docs: ["ledger"] }; } },
+    { id: "deposit", concept: "accrual", make: s => { const o = S.openOrders(s).find(x => x.paid); if (!o) return null;
+        return { text: `${S.NAMES[o.who].split(" ")[0]} paid you a <b>${o.paid}</b> deposit on ${o.sacks} sacks, which you haven't delivered. How much Revenue have you earned from that order so far?`, answer: 0, tol: 0, hints: ["Revenue is earned when the grain is delivered.", "The deposit is Cash, but what is it on the balance sheet?"], work: `0. The ${o.paid} is a liability, Customer deposits, until you deliver.`, docs: ["ledger"] }; } },
+    { id: "fund", concept: "statements", make: s => { const f = S.crownFund(s); return { text: `Toward the Crown: add Cash <b>${S.balanceSheet(s.bal).cash}</b>, receivables <b>${S.balanceSheet(s.bal).ar}</b> and Inventory <b>${S.balanceSheet(s.bal).inv}</b>, then take away what you owe (payables, loan, deposits: <b>${f.owe.reduce((a, r) => a + r[1], 0)}</b>). What do you get?`,
+        answer: f.net, tol: 0, hints: ["What you could pay with, minus what you owe.", "It's the number in the top bar."], work: `${f.have.map(r => r[1]).join(" + ")} − ${f.owe.reduce((a, r) => a + r[1], 0)} = ${f.net}.`, docs: [] }; } },
+  ];
+  // choose today's problem: concepts you have met but not mastered come up most; nothing you were asked in the last three days; the same day always picks the same one
+  function pick(s, level, allow) {
+    s.practice = s.practice || { streak: 0, best: 0, favour: 0, recent: [], done: {}, log: [] }; const p = s.practice, W = { unseen: 0, introduced: 1.6, practiced: 1.1, mastered: .35 };
+    const cands = BANK.map(b => ({ b, q: b.make(s) })).filter(x => x.q && (!allow || allow(x.b.concept)) && !p.recent.slice(-3).includes(x.b.id));
+    if (!cands.length) return null; const score = x => (W[level ? level(x.b.concept) : "introduced"] || .6) + (hash(x.b.id + ":" + s.day) % 100) / 400;
+    cands.sort((a, b) => score(b) - score(a)); const c = cands[0]; return Object.assign({ id: c.b.id, concept: c.b.concept }, c.q);
+  }
+  // "which of these two offers puts more Cash in the chest by the end of the season?" Cash comes the day a buyer pays: delivery on the due day plus the terms; later than day 28 is not Cash yet.
+  function compare(s) {
+    const offers = s.offers.filter(o => !o.deposit || true).slice(0, 4); if (offers.length < 2) return null;
+    const a = offers[0], b = offers.find(o => o !== a && (o.terms !== a.terms || o.price !== a.price) ) || offers[1], cash = o => { const day = o.due + (o.terms || 0), net = o.sacks * o.price; return { day, in28: day <= S.R.days, cash: day <= S.R.days ? net : 0, value: net }; };
+    const A = cash(a), B_ = cash(b); const label = (o, c) => `${S.NAMES[o.who].split(" ")[0]}: ${o.sacks} sacks at ${o.price} (${o.value || o.sacks * o.price}), ${o.terms ? `paid ${o.terms} days after delivery` : "Cash on delivery"}, due day ${o.due}`;
+    const best = A.cash === B_.cash ? 2 : A.cash > B_.cash ? 0 : 1;
+    return { id: "compare", concept: "wc", offers: [a, b], labels: [label(a, A), label(b, B_)], cash: [A.cash, B_.cash], answer: best,
+      text: `Two offers are on the table, and you can only grow for one:<br><b>A</b> ${label(a, A)}<br><b>B</b> ${label(b, B_)}<br>Which puts <b>more Cash in the chest by the end of spring (day ${S.R.days})</b>?`,
+      work: `A: ${A.in28 ? `${A.cash} in Cash on day ${A.day}` : `${A.value} of Revenue but the Cash arrives on day ${A.day}: not by day ${S.R.days}`}. B: ${B_.in28 ? `${B_.cash} in Cash on day ${B_.day}` : `${B_.value} of Revenue but the Cash arrives on day ${B_.day}: not by day ${S.R.days}`}. Revenue isn't Cash until they pay.` };
+  }
+  const available = (s, level, allow) => { s.practice = s.practice || { streak: 0, best: 0, favour: 0, recent: [], done: {}, log: [] }; return s.practice.done[s.day] ? null : pick(s, level, allow); };
+  // record the result of a problem: a streak of consecutive days, favours for right answers on your own
+  function record(s, prob, right, walked) {
+    const p = s.practice = s.practice || { streak: 0, best: 0, favour: 0, recent: [], done: {}, log: [] }; p.done[s.day] = right ? 2 : 1; p.recent.push(prob.id); if (p.recent.length > 8) p.recent.shift();
+    const yesterday = p.done[s.day - 1] || p.done[s.day - 2]; if (right) { p.streak = yesterday ? p.streak + 1 : 1; p.best = Math.max(p.best, p.streak); if (!walked) p.favour++; } else if (!yesterday) p.streak = 0;
+    p.log.push({ day: s.day, id: prob.id, right: !!right, walked: !!walked }); return p;
+  }
+  return { BANK, pick, available, compare, record, ids: BANK.map(b => b.id) };
+})();
