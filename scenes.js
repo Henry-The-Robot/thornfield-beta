@@ -23,7 +23,7 @@ window.Scenes = (function () {
         else { await c.lines("ashby", ["Eleven. The rest are still 'meaning to'. I keep their names in the flour bin. For luck."]); c.flag("ashbyPromise", "ledger"); }
         c.flag("ashbyAsked", true); c.trust("ashby", 1);
       } },
-    { id: "crane_offduty", who: "crane", from: 13, to: 17, at: [32, 10], card: ["A second seal on the writ", "small, scratched, under the Crown's"], hint: "Crane is standing by the well without his ledger.",
+    { id: "crane_offduty", who: "crane", from: 13, to: 17, at: [32, 10], card: ["A scratched second seal", "under the Crown's seal"], hint: "Crane is standing by the well without his ledger.",
       async run(c) {
         await c.lines("crane", ["Heir. I am off duty. I have left my ledger at home. I feel exposed.", "I am not here to collect. I am here to say something I am not employed to say.", "Item: the writ you carry. I have read it eleven times. Item: it is longer than it should be. Item: a debt of this kind does not usually come with a second seal."]);
         const k = await c.ask("crane", "He waits, pen-less, which seems to hurt him.", ["A second seal?", "Why tell me?"]);
@@ -58,7 +58,7 @@ window.Scenes = (function () {
         await c.lines("ezra", ["He's right that I never lied to him. It was the only kindness I knew how to do him.", "If you want the rest, bring me a forecast I can believe."]);
         c.trust("ezra", 2);
       } },
-    { id: "mira_rumour", who: "mira", from: 17, card: ["Someone is buying the valley's notes", "forty cents on the coin"], hint: "Mira is dying to tell someone something.",
+    { id: "mira_rumour", who: "mira", from: 17, card: ["Someone buys the valley's notes", "forty cents a coin"], hint: "Mira is dying to tell someone something.",
       async run(c) {
         await c.lines("mira", ["Between us and the cabbages: do you know who's buying paper?", "Grey cloak. Gloves. Every village from here to the river. Not grain, not seed: notes. Mortgages. A bakery guarantee, a mill loan, a sixty-coin promise from some widow's late husband."]);
         const k = await c.ask("mira", "She is whispering at the top of her voice.", ["Who sold him the paper?", "Why would he want it?"]);
@@ -85,7 +85,7 @@ window.Scenes = (function () {
         await c.letter(6);
         c.flag("guarantee", true); c.clue(); c.trust("ashby", 3);
       } },
-    { id: "crane_seal", who: "crane", from: 23, at: [32, 10], card: ["The second seal is Vane's mark", "a note-buyer's mark: the Crown sold your debt"], need: s => s.flags && s.flags.craneSeal, hint: "Crane is by the well again. He has a paper.",
+    { id: "crane_seal", who: "crane", from: 23, at: [32, 10], card: ["Vane's mark on the seal", "Crown sold your debt"], need: s => s.flags && s.flags.craneSeal, hint: "Crane is by the well again. He has a paper.",
       async run(c) {
         await c.lines("crane", ["Item: I have a copy of the writ. Item: it is a copy I should not have made. Item: I made it.", "The second seal. I looked it up. A man in the counting-house taught me, once, to read the small ones. It is a note-buyer's mark. It means the Crown sold your debt, heir. To someone."]);
         const k = await c.ask("crane", "He holds the paper at arm's length, as if it might go off.", ["To whom?", "Can they do that?"]);

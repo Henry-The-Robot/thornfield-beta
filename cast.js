@@ -125,5 +125,7 @@ window.Cast = (function () {
       .map(t => ({ id: t.id, label: t.label, lines: t.lines, heard: !!s.heard[who + ":" + t.id] }));
   }
   const locked = (who, s) => { const c = WHO[who]; if (!c || !c.topics) return 0; return c.topics.length - topics(who, s).length; };
-  return { WHO, greet, topics, locked, name: id => WHO[id] ? WHO[id].name : id };
+  // a one-word name for a clue card's source: "Maud Fenwick, the reeve" -> Maud, "Tomas the seed merchant" -> Tomas, "Bailiff Crane" -> Crane
+  const short = id => { const n = (WHO[id] ? WHO[id].name : id).split(",")[0], w = n.split(" "); return / the /.test(n) || w.length === 1 ? w[0] : w[w.length - 1]; };
+  return { WHO, greet, topics, locked, short, name: id => WHO[id] ? WHO[id].name : id };
 })();

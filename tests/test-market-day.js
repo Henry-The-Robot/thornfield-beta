@@ -9,7 +9,7 @@ const growing = s => s.plots.filter(p => p.crop).length;
 const invTies = s => s.bal.inv === s.sacks * S.R.unitCost + s.seeds * S.R.seedCost + growing(s) * S.R.seedCost;
 
 // ---- the calendar ----
-ok([7, 14, 21].every(d => M.isDay(d, {})) && !M.isDay(8, {}) && M.isDay(28, {}) && !M.isDay(28, { finaleDone: true }), "fair on days 7, 14, 21, and 28 only if the story has no finale yet");
+ok([7, 14, 21].every(d => M.isDay(d, {})) && !M.isDay(8, {}) && !M.isDay(28, {}) && !M.isDay(28, { finaleDone: true }) && M.FAIR_DAYS.join() === "7,14,21", "fair on days 7, 14 and 21 only: day 28 is the Court (creative call 4)");
 
 // ---- determinism: same game, same villagers ----
 { const a = M.villagers(14, 1), b = M.villagers(14, 1); ok(JSON.stringify(a) === JSON.stringify(b), "the same day and hour always bring the same 8 villagers");

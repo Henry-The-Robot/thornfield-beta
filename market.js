@@ -20,15 +20,15 @@
 (function (root) {
   const S = root.Spring || require("./engine.js");
   const CFG = {
-    hours: 3, perHour: 8, maxStock: 60, grisbyFrom: 14, maxPrice: 30, finale: 28,
+    hours: 3, perHour: 8, maxStock: 60, grisbyFrom: 14, maxPrice: 30,
     seg: { thrifty: { base: -1, spread: 5 }, comfortable: { base: 2, spread: 3 }, hurry: {} }, // reserve = going price + base, spread = how many whole-coin steps it ranges over
   };
-  const FAIR_DAYS = [7, 14, 21, 28];
+  const FAIR_DAYS = [7, 14, 21]; // creative call 4: day 28 belongs to the Reeve's Court, in story and sandbox alike
   const SEG_NAMES = { thrifty: "Thrifty", comfortable: "Comfortable", hurry: "In a hurry" };
   const roll = S.roll; // the engine's own stateless roll (same game, same villagers; nothing to save)
 
-  // the fair is on days 7, 14, 21, and 28 only if the story has not already given the season its finale (WS6 sets s.finaleDone)
-  const isDay = (day, s) => day === 7 || day === 14 || day === 21 || (day === CFG.finale && !(s && s.finaleDone));
+  // the fair is on days 7, 14 and 21 only; day 28 is the Court
+  const isDay = day => FAIR_DAYS.indexOf(day) >= 0;
   const grisbyIn = day => day >= CFG.grisbyFrom;
   const grisbyPrice = (market, mine) => mine > market ? mine - 1 : market; // undercut by 1 above the going price, otherwise hold
 

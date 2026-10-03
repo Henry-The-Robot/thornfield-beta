@@ -438,6 +438,7 @@
     const opts = [["Borrow 50", go(c => S.borrow(c, 50)), room < 50], ["Borrow 100", go(c => S.borrow(c, 100)), room < 100], ["Repay 50", go(c => S.repay(c, 50)), !owed || s.bal.cash < Math.min(50, owed) + S.loanFacts(s, 50).fee]];
     if (owed) opts.push(["Should I repay early?", () => repayAdvice(owed)]);
     if (inv && (!storyOn || Story.state.ch >= 8)) opts.push([`Sell ${S.NAMES[inv.who]}'s invoice (${inv.amount}) for ${Math.round(inv.amount * .85)} today`, go(c => S.factor(c, inv.id))]);
+    if (wk4() && Practice.available(s, TR.state)) opts.push(["A problem on your books", problem]);
     opts.push(["Ask Ezra about…", () => chat("ezra")]); opts.push(["Leave", null]);
     const wk = Math.round(owed * t.rateBp / 10000);
     say("ezra", `Your credit: ${hearts(s.trust.ezra)}. I lend up to ${t.loanLimit} at ${t.rateBp / 100}% a week. You owe me ${owed}${owed ? `: that's ${wk} of interest every pay-day until it's repaid. Repay before day ${S.R.prepayBefore} and I charge one week's interest on what you repay.` : "."}`, opts);
@@ -455,18 +456,20 @@
       `<i>${late ? "Bought this late, it's a good machine in a bad month: profit says yes, Cash says wait. " : ""}A machine is worth it when the savings over its life beat its price and your Cash can wait for them. Profit and Cash can disagree. That's the Ledger's lesson.</i>`,
       [["Back", tomas], ["Open the Ledger", ledger]]);
   }
-  function maud() { const c = S.coach(s), has = !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
+  // Creative call 1 (docs/TASKS-season1.md): in week 4 Maud stops teaching (no problem, shows, hints or Explain-how from her; her story scenes still play) and the daily problem comes from Ezra.
+  const wk4 = () => storyOn && Story.weekOf && Story.weekOf(s.day) === 4, teacher = () => wk4() ? "ezra" : "maud";
+  function maud() { const c = S.coach(s), has = !wk4() && !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
     say("maud", c ? c.text : Cast.greet("maud", s), opts); }
   // ---------- practice: one small problem a day on your own numbers (practice.js). A right answer on your own is evidence in the transcript; a walk-through is not. ----------
   async function problem() {
-    if (s.practice && s.practice.done[s.day]) return say("maud", "That's today's. Come back tomorrow; the numbers will have moved.");
+    const T = teacher(); if (s.practice && s.practice.done[s.day]) return say(T, T === "ezra" ? "That is today's. Come back tomorrow; patience has a price, and the numbers will have moved." : "That's today's. Come back tomorrow; the numbers will have moved.");
     const cmp = s.day >= 3 && s.offers.length >= 2 && (s.day % 3 === 0) ? Practice.compare(s) : null, p = cmp || Practice.available(s, TR.state);
-    if (!p) return say("maud", "Nothing worth asking today. Your books are quiet.");
+    if (!p) return say(T, "Nothing worth asking today. Your books are quiet.");
     window.__walked = false; let right = true;
-    if (cmp) { const r = (await dlg({ who: "maud", text: p.text, choices: ["A", "B", "The same"] })).i; right = r === p.answer; if (!right) { await sayP("maud", `Not quite. ${p.work}`, ["I see"]); } }
-    else { await ask("maud", p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; }
+    if (cmp) { const r = (await dlg({ who: T, text: p.text, choices: ["A", "B", "The same"] })).i; right = r === p.answer; if (!right) { await sayP(T, `Not quite. ${p.work}`, ["I see"]); } }
+    else { await ask(T, p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; }
     const q = Practice.record(s, p, right, !right);
-    if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust.maud != null && q.favour % 2 === 0 && s.trust.maud < 10) s.trust.maud++; toast(q.streak > 1 ? `${q.streak} days running ★` : "Maud nods."); }
+    if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust[T] != null && q.favour % 2 === 0 && s.trust[T] < 10) s.trust[T]++; toast(q.streak > 1 ? `${q.streak} days running ★` : T === "ezra" ? "Ezra inclines his head." : "Maud nods."); }
     else toast("We'll come back to this one.");
     hud(); save(); drainUses();
   }
@@ -483,7 +486,7 @@
     s.scenes[sc.id] = s.day; s.flags = s.flags || {};
     const c = { s, S, lines: async (who, arr) => { for (const t of arr) await sayP(who, t, ["Next"]); }, ask: (who, text, labels) => sayP(who, text, labels),
       maud: text => sayP("maud", text, ["Mm."]), flag: (k, v) => { s.flags[k] = v; }, clue: () => { s.clues = (s.clues || 0) + 1; // WS6: a scene that reveals a clue also pins a card on the case board (scenes.js: sc.card = [term, number-or-quote])
-        if (storyOn && sc.card) Story.pin("scene_" + sc.id, sc.card[0], sc.card[1], `Day ${s.day} · ${Cast.name(sc.who).split(",")[0]}`, "scene"); else toast(`A clue: ${s.clues} of ${Scenes.CLUES}`); },
+        if (storyOn && sc.card) Story.pin("scene_" + sc.id, sc.card[0], sc.card[1], `Day ${s.day} · ${Cast.short(sc.who)}`, "scene"); else toast(`A clue: ${s.clues} of ${Scenes.CLUES}`); },
       trust: (who, d) => { if (s.trust[who] != null) s.trust[who] = Math.max(0, Math.min(10, s.trust[who] + d)); if (d > 0) toast(`${Cast.name(who).split(",")[0]} trusts you more ♥`); },
       letter: async i => { if (storyOn) await Story.letter(i); else await page(Story.PAGES[i], Story.LETTERS[i]); } };
     try { await sc.run(c); } finally { hud(); save(); }
@@ -500,12 +503,12 @@
     const c = S.coach(s);
     const ex = storyOn ? Story.deskItems() : []; // WS6: Crane's offer and the case board join the Desk menu (before "Back to the road")
     dlg({ who: null, text: `Your desk: Edric's ledger, the forecast board, Maud's notebook.${storyOn ? Story.deskNote() : ""}${c && c.danger ? `<br><b>Maud's note:</b> ${c.text}` : ""}`,
-      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", Practice.available(s, TR.state) ? "Maud's problem (new)" : "Maud's problem (done today)", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, ...ex.map(x => x.label), "Back to the road"] })
+      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", `${wk4() ? "Ezra's problem" : "Maud's problem"} (${Practice.available(s, TR.state) ? "new" : "done today"})`, "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, ...ex.map(x => x.label), "Back to the road"] })
       .then(r => { const f = [sleepNow, ledger, ledgerTour, problem, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, letters, ...ex.map(x => x.fn), () => { atDesk = false; hud(); }][r.i]; f && f(); });
   }
-  function letters() { // every letter of Edric's you've found, newest first, to read again
-    const st = storyOn ? Story.state : { pages: [] }, ids = st.pages.slice().sort((a, b) => b - a);
-    showPanel("letters", `<h1>Edric's letters <span class="hint">${ids.length} of ${Story.LETTERS.length} found</span></h1>` + (ids.map(i => `<div class="journal small"><b>${Story.LETTERS[i]}</b><p>${Story.PAGES[i]}</p><p class="sig">— E.</p></div>`).join("") || "<p class='hint'>None yet. Edric left them where the lessons are.</p>"));
+  function letters() { // every letter of Edric's you've found, in the order you found them (the last one always last), to read again
+    const st = storyOn ? Story.state : { pages: [], pageDays: {} }, ids = storyOn ? Story.letterOrder() : [];
+    showPanel("letters", `<h1>Edric's letters <span class="hint">${ids.length} of ${Story.LETTERS.length} found</span></h1>` + (ids.map(i => `<div class="journal small"><b>${Story.LETTERS[i]}</b>${st.pageDays && st.pageDays[i] ? ` <span class="hint">found day ${st.pageDays[i]}</span>` : ""}<p>${Story.PAGES[i]}</p><p class="sig">— E.</p></div>`).join("") || "<p class='hint'>None yet. Edric left them where the lessons are.</p>"));
   }
   function plan() {
     const o = S.openOrders(s), need = S.committed(s) - s.sacks - S.sacksComing(s);

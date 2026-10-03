@@ -40,7 +40,7 @@ window.Story = (function () {
     // WS6 (index 9): the midpoint page, found the night Corvin Vane brings his order. Numbers are the game's own constants (S.R.duke).
     `Corvin Vane was here again with the Duke's order: ${S.R.duke.sacks} sacks at ${S.R.duke.price}, paid ${S.R.duke.terms} days after delivery. The same order as last spring. The same as the spring before. I sign, I borrow for seed, and by Midwinter I'm begging Ezra. I begin to think he counts on it.`,
   ];
-  function fresh() { return { ch: 1, stage: "intro", notebook: [], pages: [], clues: [], weeks: [], farm: "Thornfield" }; }
+  function fresh() { return { ch: 1, stage: "intro", notebook: [], pages: [], pageDays: {}, clues: [], weeks: [], farm: "Thornfield" }; }
   function init(g, saved) { G = g; st = Object.assign(fresh(), saved || {}); goal(); }
   // Objective text per stage ("Title: what to do"); the ribbon adds "Week N · <title>" in front (see goal()).
   const GOALS = {
@@ -70,12 +70,20 @@ window.Story = (function () {
   function to(ch, stage) { if (window.Verbs) Verbs.parchClose(); /* a lesson page never outlives its stage */ st.ch = ch; st.stage = stage; G.s.quiet = ch <= 4; goal(); G.save(); }
   // ---------- the case board (item 5): every lesson and journal page pins a clue; WS8's Ledger Duel reads Story.state.clues ----------
   // clue = { id, term, num (the player's own number, as text), from (where it came from), day, kind: "lesson" | "page" | "book" }
+  // Creative call 3: a clue card is a short title + the player's number + where it was found, 12 words at most in all (title <= 6, number <= 5, source <= 4, then trimmed to fit).
+  const toks = x => String(x == null ? "" : x).trim().split(/\s+/).filter(Boolean), words = x => toks(x).filter(w => /[A-Za-z0-9]/.test(w)), clip = (x, n) => { const all = toks(x), out = []; let k = 0; for (const w of all) { if (/[A-Za-z0-9]/.test(w)) { if (k === n) return out.join(" ").replace(/[,;:.\-–·\s]+$/, "") + "…"; k++; } out.push(w); } return out.join(" "); };
+  function tidyClue(term, num, from) {
+    let t = clip(String(term).replace(/\s*\([^)]*\)/g, ""), 6), n = clip(num, 5), f = clip(from, 4);
+    while (words(t).length + words(n).length + words(f).length > 12) { if (words(n).length > 3) n = clip(n, words(n).length - 1); else if (words(f).length > 2) f = clip(f, words(f).length - 1); else t = clip(t, words(t).length - 1); }
+    return { term: t, num: n, from: f };
+  }
   function pin(id, term, num, from, kind) {
     if (st.clues.some(c => c.id === id)) return;
-    st.clues.push({ id, term, num, from: from || `Day ${G.s.day}`, day: G.s.day, kind: kind || "lesson" });
+    const c = tidyClue(term, num, from || `Day ${G.s.day}`); term = c.term; num = c.num; from = c.from;
+    st.clues.push({ id, term, num, from, day: G.s.day, kind: kind || "lesson" });
     G.toast(`Pinned to the case board: ${term}`);
   }
-  async function page(i) { if (st.pages.indexOf(i) < 0) st.pages.push(i); await G.page(PAGES[i], LETTERS[i]); pin("page" + i, `Edric's letter: ${LETTERS[i]}`, `“${PAGES[i].split(/[.?]/)[0]}…”`, `Day ${G.s.day} · Edric's journal`, "page"); }
+  async function page(i) { if (st.pages.indexOf(i) < 0) { st.pages.push(i); (st.pageDays = st.pageDays || {})[i] = G.s.day; } await G.page(PAGES[i], LETTERS[i]); pin("page" + i, LETTERS[i], "Edric's letter", `Day ${G.s.day} · journal`, "page"); }
   // ---------- week title cards: one line, tap to dismiss (never blocks the story; fades by itself) ----------
   function weekCard(w, hold) {
     document.querySelectorAll(".wkcard").forEach(e => e.remove());
@@ -264,7 +272,7 @@ window.Story = (function () {
       keep("ap", "Accounts payable & trade credit", "What you owe a supplier. Free credit until the due day; paying early can buy a discount.", `Day ${day0}: seed bill ${bill.amount}, ${disc}% off by day ${bill.discBy} = ${bill.disc}; you ${took ? "paid early" : "kept the Cash"}.`, `owed ${bill.amount}, due day ${bill.due}`);
       keep("tvm", "Money now vs money later (time value)", "A discount for paying early is an interest rate. Compare it with what the Cash would cost you, Ezra's weekly rate. Whichever is cheaper this week wins, and the answer can flip when the rate moves.", ex, `${disc}% vs ${rate}% a week`, `Day ${day0} · Tomas's terms`);
       st.tvmRate = rate;
-    } else { addEx("tvm", ex); pin("tvm2", "Tomas offers again", `${disc}% vs ${rate}% a week`, `Day ${day0} · the answer ${st.tvmRate !== rate ? "flipped" : "held"} when Ezra's rate moved`); }
+    } else { addEx("tvm", ex); pin("tvm2", "Tomas offers again", `${disc}% vs ${rate}% a week`, `Day ${day0} · it ${st.tvmRate !== rate ? "flipped" : "held"}`); }
     return true;
   }
   async function ch6() { if (await tvmScene(false)) to(7, "ezra7"); }
@@ -316,7 +324,7 @@ window.Story = (function () {
       : c === 0 ? "Your board says you can carry it. Then carry it." : c === 1 ? `Half: ${half} sacks, and about ${money(Math.round(delta / 2))} less tied up. Growth you can't fund isn't growth.` : "Growth you can't fund isn't growth. Edric never learned that.");
     const choice = [`all ${sacks}`, "half", "to decline"][c];
     if (n === 1) keep("overtrading", "Overtrading", "Taking more orders than your Cash can carry: profit on paper, broke in fact. The gap grows with sales and only comes back when growth stops. Forecast before you say yes.", `Corvin's first order, ${sacks} sacks: lowest Cash ${low.close} on day ${low.day} if taken, ${money(delta)} tied up. You chose: ${choice}.`, `Cash low ${low.close}, ${money(delta)} tied up`, `Day ${G.s.day} · Corvin's first order`);
-    else { addEx("overtrading", `The double order, ${sacks} sacks: lowest Cash ${low.close}, ${money(delta)} tied up (the first tied up ${money(st.tied1 || 0)}). You chose: ${choice}.`); pin("duke2", "Corvin's double order", `${money(delta)} tied up (was ${money(st.tied1 || 0)})`, `Day ${G.s.day} · Corvin's second order`); }
+    else { addEx("overtrading", `The double order, ${sacks} sacks: lowest Cash ${low.close}, ${money(delta)} tied up (the first tied up ${money(st.tied1 || 0)}). You chose: ${choice}.`); pin("duke2", "Corvin's double order", `${money(delta)} tied up (was ${money(st.tied1 || 0)})`, `Day ${G.s.day} · second order`); }
     if (n === 1) to(8, "page8"); else to(8, "tomas9");
   }
   async function ch9t() { await tvmScene(true); to(9, "run9"); } // week 3: Tomas offers again; Ezra's rate has moved, and the answer can flip
@@ -347,7 +355,7 @@ window.Story = (function () {
         `</table><p>Every spring the Ledger climbs and the chest does not. The gap is the same place every time: in sacks no one has paid for, and in Corvin's invoice.</p><p class="sig">— E.</p></div><button class="btn gold" id="pgok">Keep it</button>`);
       document.getElementById("pgok").onclick = () => { G.hidePanel(); res(); };
     });
-    pin("cashbook", "Edric's cash book", `Ledger ${V.fmt(last.ni)}, chest ${V.fmt(last.cash)} on day ${last.day}`, `Day ${s.day} · the second ledger`, "book");
+    pin("cashbook", "Edric's cash book", `profit ${V.fmt(last.ni)}, Cash ${V.fmt(last.cash)}`, `Day ${s.day} · second ledger`, "book");
     st.book = true;
     await tell("From here I'm quiet. If the farm is in danger, you'll hear it from me. Otherwise it's your books and your argument.");
   }
@@ -361,7 +369,7 @@ window.Story = (function () {
       ["Look at the brackets: they're Cash that left, or never came.", "The biggest bracketed number between Net income and Cash from operations."]);
     if (misses === 0) { mastered("cfs"); mastered("statements"); } // right on the first tap
     await G.reveal("none", `${h.text}<br>That's what killed Edric: profit in the Ledger, the coin in other people's purses.`);
-    if (st.pages.indexOf(4) < 0) st.pages.push(4);
+    if (st.pages.indexOf(4) < 0) { st.pages.push(4); (st.pageDays = st.pageDays || {})[4] = G.s.day; }
     await G.reveal("none", `<span class="journal small">Edric's last page: “${PAGES[4]}”</span>`);
     keep("statements", "The three statements", "Income statement: did you make a profit? Balance sheet: what you own and owe. Cash-flow statement: where the Cash went.", `Spring: net income ${stm.is.net}, Cash ${stm.cf.change >= 0 ? "up" : "down"} ${Math.abs(stm.cf.change)}. ${h.text.split(": ").pop()}`);
     to(9, "done");
@@ -414,7 +422,7 @@ window.Story = (function () {
       : o.mercy ? `Item: Cash is ${money(o.cash)}, and ${money(o.wages)} of wages fall due. Item: I am instructed to repeat the offer for ${farm} at a reduced ${money(o.price)}. Item: I still do not recommend it.`
       : `Item: Corvin Vane's offer for ${farm} stands at ${money(o.price)}. Item: I am obliged to say so.`;
     const c = await G.say("crane", intro, ["No. The farm stays.", `Sell ${farm} for ${money(o.price)}`]);
-    if (c === 0) { pin("offer", "Crane's offer", `${money(o.price)} now`, `Day ${G.s.day} · Crane's offer (money now vs the farm later)`); return false; }
+    if (c === 0) { pin("offer", "Crane's offer", `${money(o.price)} now`, `Day ${G.s.day} · money now, farm later`); return false; }
     const sure = await G.say("maud", `That is ${money(o.price)} now, and the season ends here. Is it a fair price for ${farm}, or is it the price of being frightened?`, ["Keep the farm", "Sell. It's done."]);
     if (sure === 0) return false;
     await sell(o); return true;
@@ -422,7 +430,7 @@ window.Story = (function () {
   async function sell(o) {
     const s = G.s; s.sold = { price: o.price, day: s.day, mercy: o.mercy }; s.sold.so = Endings.soldOut(s, o.price);
     TR.use("tvm", false, s.day); TR.use("equation", false, s.day); // introduced, not credited: selling is not evidence of skill
-    pin("offer", "Crane's offer", `took ${money(o.price)} on day ${s.day}`, `Day ${s.day} · you sold ${farmName()}`);
+    pin("offer", "Crane's offer", `took ${money(o.price)} on day ${s.day}`, `Day ${s.day} · you sold`);
     s.over = true; s.outcome = "sold"; G.save(); G.hud(); await showEnding("sold");
   }
   // ---------- endings (item 4): an epilogue card with 3-4 lines and what it unlocks for the next game ----------
@@ -468,7 +476,7 @@ window.Story = (function () {
     const m = { tomas: { tomas2: ch2, tomas6: ch6, tomas9: ch9t }, ashby: { ashby3: ch3 }, hobb: { hobb4: ch4 }, ezra: { ezra7: ch7 }, duke: { duke8: ch8, duke9: ch8b } }[who];
     if (m && m[st.stage]) { run(m[st.stage]); return true; }
     // Integration: from chapter 5 on, a waiting village scene (#28) or the day's practice problem (#29) must reach the player, so Maud's hint/silence lines below stand aside and game.js shows her menu
-    if (who === "maud" && st.ch >= 5 && ((window.Scenes && Scenes.available("maud", G.s)) || (window.Practice && Practice.available(G.s, TR.state)))) return false;
+    if (who === "maud" && st.ch >= 5 && ((window.Scenes && Scenes.available("maud", G.s)) || (weekOf(G.s.day) !== 4 && window.Practice && Practice.available(G.s, TR.state)))) return false; // (week 4: no problem from Maud, see game.js)
     if (who === "maud" && weekOf(G.s.day) === 4) { run(async () => { const c = S.coach(G.s); await tell(c && c.danger ? c.text : "Maud only nods toward the door. This week she speaks only when the farm is in danger."); }); return true; } // week 4: silent but for danger
     if (who === "maud" && st.ch < 9 && st.stage !== "done") { run(() => tell(`Next: ${goalText().split(": ").slice(1).join(": ")}`)); return true; }
     return false;
@@ -497,6 +505,8 @@ window.Story = (function () {
     });
   }
   const quietOffers = () => st && st.ch <= 4; // no stray orders while the first lessons run
-  return { init, start, onTalk, after, close, quietOffers, letter: page, LETTERS, goalTexts: () => GOALS, get state() { return st; }, get busy() { return busy; }, TITLES, WEEKS, PAGES, fresh, weekCard, weekOf, pin, farmName,
-    testScene, noteDeposit, craneOffer, caseBoard, deskItems, deskNote, showEnding, testEnding, nameFarm }; // WS6 hooks used by game.js and the tests; letter/LETTERS are #28's
+  // Edric's letters in the order you found them (earliest day first); "The thing I signed" is always last, after the Court
+  const letterOrder = () => { const d = (st && st.pageDays) || {}, last = LETTERS.indexOf("The thing I signed"); return (st ? st.pages : []).slice().sort((a, b) => (a === last) - (b === last) || (d[a] == null ? 99 : d[a]) - (d[b] == null ? 99 : d[b]) || a - b); };
+  return { init, start, onTalk, letterOrder, after, close, quietOffers, letter: page, LETTERS, goalTexts: () => GOALS, get state() { return st; }, get busy() { return busy; }, TITLES, WEEKS, PAGES, fresh, weekCard, weekOf, pin, farmName,
+    testScene, noteDeposit, tidyClue, craneOffer, caseBoard, deskItems, deskNote, showEnding, testEnding, nameFarm }; // WS6 hooks used by game.js and the tests; letter/LETTERS are #28's
 })();
