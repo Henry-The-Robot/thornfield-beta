@@ -1,5 +1,13 @@
 # Changelog
 
+## T6 + T6b: the frost almanac, the real floor, break-even, Grisby with teeth
+- **Frost almanac (expected value vs ruin).** The evening before the frost the notice board gives the odds of a HARD frost (1 in 3) and the price of straw (5 a plot). Cover (certain cost, crops safe) or risk it (on average cheaper, but a hard frost kills every uncovered crop, written off at cost). After the choice Maud sets the average against the certain price and says whether losing the crops would have cost you your Crown verdict. Only a player who answers is exposed, so unattended play (bots, sandbox tuning) is unchanged. Transcript: "Expected value & ruin".
+- **Opportunity-cost floor bet** after the first Market Day: Ashby offers 5, above the sack's cost; what is the lowest price worth taking? (The fair paid more.) Optional stake through Maud's usual bet. Transcript: "Opportunity cost".
+- **Break-even cell** in every tally: "you kept N a sack; the week's wages and interest are W; how many sacks cover it?" Two tries, evidence only for a first-try answer.
+- **Grisby matters:** above the going price he undercuts by 2 (was 1); he brings a limited stock (24 in week 2, only 5 in week 3), so he sells out part-way through the week-3 afternoon. His board shows what he asked, his stock left and what he took (and how much of it was really yours).
+- **Market Day critic fixes (T6b):** Maud's bet is settled on every path (a fair quit part-way refunds the stake); Grisby's sales are capped by his stock; the demand chart leaves off earlier fairs played under the other rival condition and earlier sold-out hours; Transcript credit for demand/segments needs a price change that RAISED takings; "takings would up" reads rise/fall/stay the same.
+- Tests: `test-frost.js`, `test-market-day.js` (Grisby stock, experiment, bet settlement), `market-t6.html`.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]

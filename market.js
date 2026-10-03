@@ -21,6 +21,8 @@
   const S = root.Spring || require("./engine.js");
   const CFG = {
     hours: 3, perHour: 8, maxStock: 60, grisbyFrom: 14, maxPrice: 30, finale: 28,
+    // Grisby's stock for the afternoon: plenty in week 2, and in week 3 he is running low (T6: he undercuts hard, then sells out and you win the thrifty crowd back)
+    gStock: { 14: 24, 21: 5, 28: 24 },
     seg: { thrifty: { base: -1, spread: 5 }, comfortable: { base: 2, spread: 3 }, hurry: {} }, // reserve = going price + base, spread = how many whole-coin steps it ranges over
   };
   const FAIR_DAYS = [7, 14, 21, 28];
@@ -30,7 +32,9 @@
   // the fair is on days 7, 14, 21, and 28 only if the story has not already given the season its finale (WS6 sets s.finaleDone)
   const isDay = (day, s) => day === 7 || day === 14 || day === 21 || (day === CFG.finale && !(s && s.finaleDone));
   const grisbyIn = day => day >= CFG.grisbyFrom;
-  const grisbyPrice = (market, mine) => mine > market ? mine - 1 : market; // undercut by 1 above the going price, otherwise hold
+  // T6: above the going price he undercuts by 2 (never below cost + 1); at or below it he holds at the going price, so a tie stays with you
+  const grisbyPrice = (market, mine) => mine > market ? Math.max(S.R.unitCost + 1, mine - 2) : market;
+  const grisbyStock = day => CFG.gStock[day] != null ? CFG.gStock[day] : 24;
 
   // the 8 villagers who walk by in an hour (same game, same villagers). Every hour has the same mix (3 thrifty, 3 comfortable, 2 in a hurry)
   // and each segment's reserves are stratified (one from each band, with a roll inside the band), so an hour's demand depends on YOUR PRICE and
@@ -56,13 +60,15 @@
   // ---------- a fair ----------
   function newFair(s, o) {
     o = o || {}; const day = s.day, stock = Math.max(0, Math.min(o.stock != null ? o.stock : s.sacks, s.sacks, CFG.maxStock));
-    return { day, market: S.marketPrice(day), grisby: grisbyIn(day), stock0: stock, stock, hour: 0, hours: [], cost: S.R.unitCost };
+    const g0 = grisbyIn(day) ? grisbyStock(day) : 0;
+    return { day, market: S.marketPrice(day), grisby: grisbyIn(day), gStock0: g0, gStock: g0, stock0: stock, stock, hour: 0, hours: [], cost: S.R.unitCost };
   }
   function playHour(f, price) { // price: your price this hour; returns the hour record (events in arrival order)
     price = Math.max(1, Math.min(CFG.maxPrice, Math.round(price)));
-    const g = f.grisby ? grisbyPrice(f.market, price) : null, stock0 = f.stock, ev = [], segSeen = {}, segBought = {};
+    const g = f.grisby ? grisbyPrice(f.market, price) : null, stock0 = f.stock, gOut0 = f.grisby && f.gStock <= 0, ev = [], segSeen = {}, segBought = {};
     villagers(f.day, f.hour).forEach(v => {
-      const d = decide(v, price, g, f.stock); if (d.to === "me") f.stock -= d.qty;
+      // Grisby sells only what he has: once his stock is gone the thrifty crowd comes back to you (a villager he can only half-serve takes what is left)
+      const d = decide(v, price, f.grisby && f.gStock > 0 ? g : null, f.stock); if (d.to === "me") f.stock -= d.qty; else if (d.to === "grisby" && d.react === "bought") { d.qty = Math.min(d.qty, f.gStock); f.gStock -= d.qty; }
       segSeen[v.seg] = (segSeen[v.seg] || 0) + 1; if (d.react === "bought") segBought[v.seg] = (segBought[v.seg] || 0) + 1;
       ev.push(Object.assign({}, v, d));
     });
@@ -70,7 +76,7 @@
     // 'stolen' = sales Grisby made to villagers who would have paid YOUR price (reserve >= yours): the ones he really cost you.
     // The rest of 'toGrisby' bought from him only because he was cheaper than they would have paid you for, so you never had them.
     const stolen = ev.filter(e => e.to === "grisby" && e.react === "bought" && e.reserve >= price).reduce((a, e) => a + Math.min(e.qty, 1 + (price <= e.reserve - 2 ? 1 : 0)), 0);
-    const rec = { hour: f.hour, price, grisbyPrice: g, stockStart: stock0, units, revenue: units * price, gross: units * (price - f.cost), soldOutAt: ev.find(e => e.react === "soldout") ? ev.findIndex(e => e.react === "soldout") : -1,
+    const rec = { hour: f.hour, price, grisbyPrice: gOut0 ? null : g, grisbyOut: gOut0, grisbyStockLeft: f.grisby ? f.gStock : null, stockStart: stock0, units, revenue: units * price, gross: units * (price - f.cost), soldOutAt: ev.find(e => e.react === "soldout") ? ev.findIndex(e => e.react === "soldout") : -1,
       toGrisby: lost, stolen, segSeen, segBought, events: ev, counts: ev.reduce((c, e) => (c[e.react] = (c[e.react] || 0) + 1, c), {}) };
     f.hours.push(rec); f.hour++; return rec;
   }
@@ -98,6 +104,16 @@
     return t;
   }
   const history = s => (s.market && s.market.fairs) || [];
+  // Did the player run an experiment that worked? A price change between hours that RAISED takings (T6b: showing up with two different prices isn't enough).
+  const experiment = f => f.hours.some((h, i) => i > 0 && h.price !== f.hours[i - 1].price && h.revenue > f.hours[i - 1].revenue && h.soldOutAt < 0);
+  // Maud's bet (day 14): settle it on any path. A finished fair is judged; a fair abandoned part-way (the page closed, the game reloaded) refunds the stake, so a quit never costs coin.
+  function settleBet(s) {
+    const m = s.market, b = m && m.bet; if (!b || !b.guess || b.settled) return null;
+    const fair = m.fairs.find(x => x.day === b.day), done = fair && fair.points.length >= CFG.hours;
+    if (!done && s.day <= b.day && !fair) return null; // the fair is still ahead or just beginning
+    if (!done) { S.post(s, "wager", `Maud's bet on your fair price: the fair was left unfinished, stake ${b.stake} refunded`, { cash: b.stake, upkeep: -b.stake }); b.settled = "refunded"; return "refunded"; }
+    const win = b.guess === b.answer; if (win) S.wagerWin(s, b.stake || 2, "Maud's bet on your fair price"); b.settled = win ? "won" : "lost"; return b.settled;
+  }
 
   // ---------- Maud's bet (day 14): will raising your price by 1 raise or lower your takings? ----------
   function betAnswer(s, price, stock) { const a = flat(s, price, stock).revenue, b = flat(s, price + 1, stock).revenue; return { answer: b > a ? "up" : b < a ? "down" : "same", now: a, then: b }; }
@@ -123,7 +139,7 @@
   };
   function auto(s, bot, stock) { const f = newFair(s, { stock }); while (f.hour < CFG.hours) playHour(f, bot.pick(f)); commit(s, f); return f; }
 
-  root.Market = { CFG, FAIR_DAYS, SEG_NAMES, isDay, grisbyIn, grisbyPrice, villagers, decide, newFair, playHour, totals, flat, bestFlat, commit, commitHour, history, betAnswer, demandFit, bots, auto, roll };
+  root.Market = { CFG, FAIR_DAYS, SEG_NAMES, isDay, grisbyIn, grisbyPrice, grisbyStock, experiment, settleBet, villagers, decide, newFair, playHour, totals, flat, bestFlat, commit, commitHour, history, betAnswer, demandFit, bots, auto, roll };
   if (typeof module !== "undefined") module.exports = root.Market;
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -199,6 +215,7 @@ if (typeof document !== "undefined") (function (root) {
 
   // ---------- the goal-ribbon line: game.js adds this under the chapter goal on a fair day ----------
   function goalLine(s, busy) {
+    if (s) try { M.settleBet(s); } catch (e) {} // a bet left over from a fair that was quit part-way is refunded the next time the screen refreshes
     if (!s || busy) return "";
     if (available(s)) return `<div class="mk-goal"><span class="k">Market Day</span> Set your own prices at the stall and watch who buys. <button type="button" class="btn gold" data-mk="go">To the stall</button></div>`;
     return "";
@@ -217,6 +234,7 @@ if (typeof document !== "undefined") (function (root) {
   function open() {
     const s = G.s;
     if (st) return;
+    M.settleBet(s);
     if (!M.isDay(s.day, s)) return G.say("maud", `Market Day is on days 7, 14 and 21. Today is day ${s.day}. Bring grain you can spare.`, ["Close"]);
     if (history(s).some(f => f.day === s.day)) return G.say("maud", "You've had your fair today. The next one is the next 7th day.", ["Close"]);
     if (!s.sacks) return G.say("maud", "The barn is empty. There is nothing to put on the stall. Come back with sacks you can spare.", ["Close"]);
@@ -258,7 +276,7 @@ if (typeof document !== "undefined") (function (root) {
       const over = st.bring > st.spare && st.committed > 0;
       p.innerHTML = `<div class="mk-row"><div class="mk-box"><h3>Sacks to bring</h3>${stepper("bring", st.bring, "sacks", "Sacks")}<div class="mk-note">${s.sacks} in the barn.${st.committed ? ` Open orders still need <b>${st.committed}</b>.` : ""}</div>${over ? `<div class="mk-note bad" id="mk-warn">That dips into sacks you promised to customers.</div>` : ""}</div>
         <div class="mk-box board"><h3>Chalk board: a sack of wheat</h3>${stepper("price", st.price, "coins", "Price")}<div class="mk-note" id="mk-margin">${marginLine(st.price)}</div></div></div>
-        <div class="mk-row"><div class="mk-help">${s.market && s.market.fairs.length ? "" : `Eight villagers walk by each hour. You can change your price once an hour. Watch the faces.`}${M.grisbyIn(s.day) ? ` <b>Grisby</b> watches your board and sets his price after you.` : ""}</div>
+        <div class="mk-row"><div class="mk-help">${s.market && s.market.fairs.length ? "" : `Eight villagers walk by each hour. You can change your price once an hour. Watch the faces.`}${M.grisbyIn(s.day) ? ` <b>Grisby</b> watches your board and sets his price after you; he brings ${M.grisbyStock(s.day)} sacks today.` : ""}</div>
         <div class="mk-actions">${btn("mk-leave", "Not today", "alt")}${btn("mk-open", "Open the stall", "gold")}</div></div>`;
     } else if (st.phase === "bet") {
       const q = st.betQ; p.innerHTML = `<div class="mk-maud"><canvas id="mk-maud" width="16" height="16"></canvas><div><div class="mk-nm">Maud the reeve</div><div class="mk-say">Two coin says I know what one more coin on your board does. Say you chalk <b>${st.price + 1}</b> instead of <b>${st.price}</b> for the whole afternoon, with your ${st.bring} sacks${M.grisbyIn(s.day) ? " and Grisby watching" : ""}. Will your takings <b>rise</b>, <b>fall</b>, or <b>stay the same</b>?</div></div></div>
@@ -268,7 +286,7 @@ if (typeof document !== "undefined") (function (root) {
       const r = st.f.hours[st.f.hours.length - 1], hnext = st.f.hour + 1, c = r.counts;
       const nudge = r.soldOutAt >= 0 ? `You ran out of sacks partway through the hour: the buyers after that walked away.` : (c.hesitated || 0) >= 2 ? `${c.hesitated} villagers hesitated. A coin less may have won them.` : (c.dear || 0) >= 4 ? `Most of the crowd called it too dear.` : (c.bought || 0) >= 7 ? `Nearly everyone bought. Was your price too low?` : "";
       p.innerHTML = `<div class="mk-row"><div class="mk-box"><h3>Hour ${r.hour + 1} of ${CFG().hours}: ${r.units} sacks at ${r.price}</h3><div class="mk-faces">${["bought", "hesitated", "dear", "soldout"].filter(k => c[k]).map(k => `<span>${iconHTML(k, 26)} <b>${c[k]}</b></span>`).join("")}</div>
-        <div class="mk-note">${r.grisbyPrice != null ? `Grisby asked ${r.grisbyPrice}${r.stolen ? `; ${r.stolen} sack${r.stolen === 1 ? "" : "s"} went to him that would have been yours` : r.price > st.f.market ? "; he didn't take anyone who'd have paid you" : ""}. ` : ""}${nudge}</div></div>
+        ${gboard(r)}<div class="mk-note">${nudge}</div></div>
         <div class="mk-box board"><h3>Price for hour ${hnext}</h3>${stepper("price", st.price, "coins", "Price")}<div class="mk-note" id="mk-margin">${marginLine(st.price)}</div></div></div>
         <div class="mk-row"><div class="mk-help">${M.grisbyIn(s.day) ? "Grisby will see your new price before the hour starts." : ""}</div><div class="mk-actions">${btn("mk-fast", st.fast ? "Fast: on (tap to turn off)" : "Fast: off", "alt")}${btn("mk-next", `Open hour ${hnext}`, "gold")}</div></div>${legend()}`;
     } else if (st.phase === "walk") {
@@ -278,14 +296,51 @@ if (typeof document !== "undefined") (function (root) {
     wire(); layout();
   }
 
+  // Grisby's board: what he asked, how many sacks he has left and what he took this hour (capped by his stock; the part that was really yours is separate)
+  function gboard(r) {
+    if (!st.f.grisby) return "";
+    const took = r.toGrisby ? `took <b>${r.toGrisby}</b> sack${r.toGrisby === 1 ? "" : "s"}${r.stolen ? `, <b>${r.stolen}</b> from buyers who would have paid you` : ", none from buyers who would have paid you"}` : "took nothing";
+    return `<div class="mk-gboard"><b>Grisby's board</b> ${r.grisbyOut ? `<span class="bad">sold out: nothing left to sell</span>` : `asked <b>${r.grisbyPrice}</b>`} <span>stock left <b>${r.grisbyStockLeft}</b> of ${st.f.gStock0}</span> <span>${r.grisbyOut ? "" : took}</span></div>`;
+  }
+  // the break-even cell (T6): after the takings, one question in the player's own numbers
+  function beFacts(s, t) { const avg = t.units ? Math.round(t.revenue / t.units) : 0, keep = avg - S.R.unitCost, bill = S.weekBills(s); return keep > 0 && bill > 0 ? { avg, keep, bill, answer: Math.ceil(bill / keep) } : null; }
+  function beCell(s, t) {
+    const b = beFacts(s, t); if (!b) return ""; st.be = st.be || { tries: 0, done: false };
+    return `<div class="mk-be" id="mk-be"><b>Break-even.</b> You kept <b>${b.keep}</b> on each sack (${b.avg} − ${S.R.unitCost}). This pay-day's wages and interest come to <b>${b.bill}</b>. How many sacks at that margin cover the bill?
+      ${st.be.done ? `<span class="good">${st.be.msg}</span>` : `<input id="mk-be-in" type="text" inputmode="numeric" autocomplete="off" placeholder="sacks"><button type="button" class="mk-btn" id="mk-be-ok">Check</button> <span id="mk-be-msg" class="bad">${st.be.msg || ""}</span>`}</div>`;
+  }
+  function beWire() {
+    const ok = $("mk-be-ok"); if (!ok) return; const s = G.s, b = beFacts(s, M.totals(st.f));
+    const check = () => { const v = parseInt($("mk-be-in").value, 10); if (isNaN(v)) { $("mk-be-msg").textContent = "Type a number of sacks."; return; }
+      if (v === b.answer) { st.be.done = true; st.be.msg = st.be.tries === 0 ? `Right: ${b.bill} ÷ ${b.keep}, rounded up, is ${b.answer} sacks.` : `Yes: ${b.answer} sacks.`; if (st.be.tries === 0 && root.Transcript) root.Transcript.master("breakeven", s.day); }
+      else { st.be.tries++; if (st.be.tries >= 2) { st.be.done = true; st.be.msg = `It's ${b.answer}: ${b.bill} ÷ ${b.keep} = ${(b.bill / b.keep).toFixed(1)}, rounded up, because half a sack pays nobody.`; } else st.be.msg = "Not quite. Divide the bill by what you keep on one sack, and round up."; }
+      render(); };
+    ok.onclick = check; $("mk-be-in").addEventListener("keydown", e => { if (e.key === "Enter") check(); e.stopPropagation(); });
+  }
   function wire() {
     const p = $("mk-panel"), upd = () => { const v = $("pricev"); if (v) v.firstChild.textContent = st.price; const b = $("bringv"); if (b) b.firstChild.textContent = st.bring; const m = $("mk-margin"); if (m) m.innerHTML = marginLine(st.price); const wn = $("mk-warn"); if (wn) wn.style.display = st.bring > st.spare ? "" : "none"; };
     p.querySelectorAll("[data-st]").forEach(b => b.onclick = () => { const k = b.dataset.st, d = k.endsWith("+") ? 1 : -1, w = k.slice(0, -1);
       if (w === "price") st.price = Math.max(1, Math.min(M.CFG.maxPrice, st.price + d)); else st.bring = Math.max(1, Math.min(G.s.sacks, st.bring + d)); upd(); });
     const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
     on("mk-leave", close); on("mk-open", startAfternoon); on("mk-next", nextHour); on("mk-fast", () => { if (st.phase === "walk") { st.fast = true; finishHour(); } else { st.fast = !st.fast; render(); } }); // in the pause, Fast toggles whether the next hours play instantly
-    on("mk-done", close);
+    on("mk-done", () => { const first = M.history(G.s).length === 1; close(); if (first) setTimeout(() => floorBet(G.s), 60); });
     p.querySelectorAll("[data-bet]").forEach(b => b.onclick = () => placeBet(b.dataset.bet));
+    if (st.phase === "tally") beWire();
+  }
+
+  // T6: after the FIRST fair, Maud's opportunity-cost bet. Ashby offers 5, above the sack's cost; what is the lowest price worth taking? (The best sale you give up.)
+  async function floorBet(s) {
+    const m = s.market, V = root.Verbs; if (!m || m.floorBet || !V || !V.bet || M.history(s).length !== 1) return; const fair = M.history(s)[0]; if (!fair.units) return;
+    const cost = S.R.unitCost, alt = Math.round(fair.revenue / fair.units), offer = Math.max(cost + 1, Math.min(alt - 2, 5)); if (offer >= alt) return;
+    m.floorBet = { day: s.day }; G.save();
+    await G.say("ashby", `Cash for your spare sacks, dear: ${offer} a sack, on the nail. That's above what they cost you.`, ["Next"]);
+    window.__walked = false;
+    const r = await V.bet({ prompt: `Ashby's ${offer} is above your cost of ${cost}. Three coin says you can't name the lowest price worth taking for a spare sack, after the fair you've just had.`,
+      docs: [{ label: "Open the fair's takings", open: () => { G.showPanel("fairhist", `<h1>Your last fair</h1><table class="stm"><tr><th>Hour</th><th>Price</th><th>Sacks sold</th></tr>${fair.points.map((p, i) => `<tr><td>${i + 1}</td><td class="num">${p.price}</td><td class="num">${p.units}</td></tr>`).join("")}</table><p>${fair.units} sacks for ${fair.revenue} in all.</p><button class="btn alt" id="fhclose">Back</button>`); const b = $("fhclose"); if (b) b.onclick = () => G.hidePanel(); } }],
+      how: "What would the same sack fetch at the fair? The best sale you'd give up sets the real floor, not what the sack cost.", stake: { min: 0, max: 3 }, tol: 1, answer: () => alt, reveal: "now", kind: "floor",
+      explain: () => `The fair paid you ${alt} a sack on average. Ashby's ${offer} keeps ${offer - cost} but gives up ${alt - offer}: your real floor is ${alt}, not ${cost}.` });
+    m.floorBet.win = !!(r && r.win); if (r && r.win && !window.__walked && root.Transcript) root.Transcript.master("opportunity", s.day);
+    G.hud(); G.save();
   }
 
   // ---------- the afternoon ----------
@@ -317,17 +372,19 @@ if (typeof document !== "undefined") (function (root) {
     st.tally = { t, newBest: prev.length > 0 && t.gross > best, firstFair: prev.length === 0 };
     const prices = new Set(f.hours.map(h => h.price)).size, bet = s.market.bet && s.market.bet.day === s.day ? s.market.bet : null;
     G.act(() => { // earn the ideas: seeing a demand curve, segments, and a rival
-      // evidence of doing, not of showing up: only an actual experiment counts (a second price; a price above the going price, where Grisby answers)
-      if (prices >= 2) { s.uses.push({ id: "segments", day: s.day, well: true }); s.uses.push({ id: "demand", day: s.day, well: true }); }
+      // evidence of doing, not of showing up: only an experiment that WORKED counts (a price change between hours that raised takings); a price above the going price, where Grisby answers, shows the rival
+      if (M.experiment(f)) { s.uses.push({ id: "segments", day: s.day, well: true }); s.uses.push({ id: "demand", day: s.day, well: true }); }
       if (f.grisby && f.hours.some(h => h.price > f.market)) s.uses.push({ id: "competitor", day: s.day, well: true });
-      if (bet && bet.guess && bet.guess === bet.answer) { S.wagerWin(s, 2, "Maud's bet on your fair price"); if (root.Transcript) root.Transcript.master("demand", s.day); }
+      if (bet && bet.guess && M.settleBet(s) === "won" && root.Transcript) root.Transcript.master("demand", s.day);
       return { ok: true }; });
     top();
   }
 
   // ---------- the tally ----------
   function chartSVG(s, f) {
-    const past = M.history(s).filter(x => x.day !== f.day).flatMap(x => x.points.map(p => Object.assign({ old: true, grisby: x.grisby }, p)));
+    // earlier fairs are drawn only if they were played under the same conditions (with or without Grisby): the two aren't comparable, so the others are left off the chart.
+    // An hour that ran out of sacks says nothing about demand, so earlier sold-out hours are left off too (this fair's own are drawn hollow).
+    const past = M.history(s).filter(x => x.day !== f.day && x.grisby === f.grisby).flatMap(x => x.points.filter(p => !p.short).map(p => Object.assign({ old: true, grisby: x.grisby }, p)));
     const cur = f.hours.map((h, i) => ({ price: h.price, units: h.units, short: h.soldOutAt >= 0, n: i + 1, take: h.revenue })), all = past.concat(cur);
     let lo = Math.min(...all.map(p => p.price)) - 1, hi = Math.max(...all.map(p => p.price)) + 1; if (hi - lo < 4) { lo -= 1; hi += 1; } lo = Math.max(0, lo);
     const ymax = Math.max(10, Math.ceil((Math.max(...all.map(p => p.units)) + 1) / 2) * 2), W = 460, H = 270, L = 52, R = 16, Tp = 16, B = 44;
@@ -345,16 +402,16 @@ if (typeof document !== "undefined") (function (root) {
   function tally(p) {
     const s = G.s, f = st.f, t = st.tally.t, bet = s.market.bet && s.market.bet.day === s.day ? s.market.bet : null, cost = S.R.unitCost;
     const segSeen = {}, segBought = {}; f.hours.forEach(h => { for (const k in h.segSeen) segSeen[k] = (segSeen[k] || 0) + h.segSeen[k]; for (const k in h.segBought) segBought[k] = (segBought[k] || 0) + h.segBought[k]; });
-    const prices = new Set(f.hours.map(h => h.price)).size, past = M.history(s).filter(x => x.day !== f.day);
+    const prices = new Set(f.hours.map(h => h.price)).size, past = M.history(s).filter(x => x.day !== f.day), drawn = past.some(x => x.grisby === f.grisby && x.points.some(p => !p.short));
     const rows = f.hours.map(h => `<tr><td>${h.hour + 1}</td><td class="num">${h.price}</td><td class="num">${h.units}${h.soldOutAt >= 0 ? " <small>(sold out)</small>" : ""}</td><td class="num">${h.revenue}</td><td class="num">${h.gross}</td></tr>`).join("");
     if (st.nameLine == null) st.nameLine = !s.market.named && prices >= 2 ? (s.market.named = true, `<div class="mk-maudline"><b>Maud:</b> That's a demand curve. Yours. Each dot is one hour: the price you chalked and the sacks that left. Takings are price times sacks, so the best price is not always the lowest or the highest.</div>`)
       : !s.market.named && prices < 2 ? `<div class="mk-maudline"><b>Maud:</b> One price is only a dot, not a curve. Next fair, change your price between the hours and see what the village does.</div>` : "";
-    const nameLine = st.nameLine, betLine = bet && bet.guess ? `<div class="mk-maudline ${bet.guess === bet.answer ? "win" : "lose"}"><b>Maud's bet:</b> you said takings would <b>${bet.guess}</b>. At ${bet.price} all afternoon the model gives ${bet.now} takings; at ${bet.price + 1}, ${bet.then}. Takings ${bet.answer === "up" ? "rise" : bet.answer === "down" ? "fall" : "stay the same"}. ${bet.guess === bet.answer ? "You won: 2 coin back, and 2 more." : "You lose the 2 coin."}<br><i>A price rise wins when the sacks you lose are fewer than the extra coin on each sack that stays.</i></div>` : "";
+    const nameLine = st.nameLine, betLine = bet && bet.guess ? `<div class="mk-maudline ${bet.guess === bet.answer ? "win" : "lose"}"><b>Maud's bet:</b> you said takings would <b>${{ up: "rise", down: "fall", same: "stay the same" }[bet.guess]}</b>. At ${bet.price} all afternoon the model gives ${bet.now} takings; at ${bet.price + 1}, ${bet.then}. Takings ${bet.answer === "up" ? "rise" : bet.answer === "down" ? "fall" : "stay the same"}. ${bet.guess === bet.answer ? "You won: 2 coin back, and 2 more." : "You lose the 2 coin."}<br><i>A price rise wins when the sacks you lose are fewer than the extra coin on each sack that stays.</i></div>` : "";
     const seg = ["thrifty", "comfortable", "hurry"].filter(k => segSeen[k]).map(k => `<li><span class="sw ${k}"></span> ${M.SEG_NAMES[k]}: ${segBought[k] || 0} of ${segSeen[k]} bought</li>`).join("");
     const left = `<h2>The takings</h2><table class="mk-tab"><tr><th>Hour</th><th>Price</th><th>Sacks sold</th><th>Takings</th><th>Gross profit</th></tr>${rows}<tr class="tot"><td>Total</td><td></td><td class="num">${t.units}</td><td class="num">${t.revenue}</td><td class="num">${t.gross}</td></tr></table>
       <div class="mk-note">Gross profit is what you keep after the sacks' cost (${cost} each). ${t.unsold ? `<b>${t.unsold} sacks unsold</b>: back to the barn.` : "<b>Sold out.</b>"} ${f.grisby ? (t.stolen ? `Grisby took ${t.stolen} sack${t.stolen === 1 ? "" : "s"} from villagers who would have paid your price.` : t.toGrisby ? `Grisby sold ${t.toGrisby} sack${t.toGrisby === 1 ? "" : "s"}, but only to villagers your price had already lost.` : "Grisby sold nothing to your crowd.") : ""}</div>
-      <ul class="mk-seg">${seg}</ul>${st.tally.newBest ? `<div class="mk-best">Your best fair yet: ${t.gross} gross profit.</div>` : st.tally.firstFair ? "" : `<div class="mk-note">Best earlier fair: ${Math.max(...past.map(x => x.gross))} gross profit.</div>`}`;
-    p.innerHTML = `<div class="mk-tally"><div class="mk-tl">${left}</div><div class="mk-tr"><h2>Your demand curve</h2>${chartSVG(s, f)}<div class="mk-note">${past.length ? `Solid dots: this fair. Faded dots: earlier fairs.` : `Solid dots: this fair.`} A hollow dot is an hour you ran out of sacks, so it says nothing about demand.${fitNote()}</div></div></div>${nameLine}${betLine}<div class="mk-actions">${btn("mk-done", "Pack up the stall", "gold")}</div>`;
+      ${beCell(s, t)}<ul class="mk-seg">${seg}</ul>${st.tally.newBest ? `<div class="mk-best">Your best fair yet: ${t.gross} gross profit.</div>` : st.tally.firstFair ? "" : `<div class="mk-note">Best earlier fair: ${Math.max(...past.map(x => x.gross))} gross profit.</div>`}`;
+    p.innerHTML = `<div class="mk-tally"><div class="mk-tl">${left}</div><div class="mk-tr"><h2>Your demand curve</h2>${chartSVG(s, f)}<div class="mk-note">${drawn ? `Solid dots: this fair. Faded dots: earlier fairs ${f.grisby ? "with Grisby" : "without a rival"}.` : `Solid dots: this fair.`}${M.history(s).some(x => x.day !== f.day && x.grisby !== f.grisby) ? ` Fairs ${f.grisby ? "without" : "with"} Grisby are left off: his stall changes who buys.` : ""} A hollow dot is an hour you ran out of sacks, so it says nothing about demand.${fitNote()}</div></div></div>${nameLine}${betLine}<div class="mk-actions">${btn("mk-done", "Pack up the stall", "gold")}</div>`;
     function fitNote() { const pts = M.history(s).filter(x => x.grisby === f.grisby).flatMap(x => x.points), fit = M.demandFit(pts);
       return fit && fit.slope < 0 ? ` The dashed line runs through your hours ${f.grisby ? "with Grisby across the lane" : "without a rival"}: roughly ${(-fit.slope).toFixed(1)} fewer sacks an hour for each coin more. Eight villagers an hour is a small sample, so read it as a guide.` : ""; }
   }
@@ -379,7 +436,8 @@ if (typeof document !== "undefined") (function (root) {
     };
     const awnCol = l => l === "GRISBY" ? "#9b2335" : "#2f6f62";
     // Grisby's stall (across the lane, from week 2), then yours; villagers walk the lane between them
-    if (g) stall(224, 0, 12, 40, grisbyP, "GRISBY", 10, sp("grisby"), 40, true);
+    const gOut = !!(f && f.grisby && f.hour > 0 && f.gStock <= 0 && (st.phase !== "walk" || st.rec.grisbyOut));
+    if (g) { stall(224, 0, 12, 40, grisbyP, "GRISBY", f ? Math.min(10, Math.ceil(f.gStock / 3)) : 10, sp("grisby"), 40, true); if (gOut) { ctx.fillStyle = "#9b2335"; ctx.fillRect(196, 30, 56, 11); ctx.fillStyle = "#fff"; ctx.font = "bold 7px monospace"; ctx.textAlign = "center"; ctx.fillText("SOLD OUT", 224, 38); ctx.textAlign = "left"; } }
     stall(140, 0, 100, 118, price, "YOURS", Math.min(18, Math.ceil(Math.max(0, remaining()) / 3)), null, 0, true);
     ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.fillRect(135, 149, 10, 3); ctx.drawImage(A.people.player.up[0], 132, 134); // you, behind the counter
     if (remaining() <= 0 && st.f) { ctx.fillStyle = "#9b2335"; ctx.fillRect(112, 124, 56, 11); ctx.fillStyle = "#fff"; ctx.font = "bold 7px monospace"; ctx.textAlign = "center"; ctx.fillText("SOLD OUT", 140, 132); ctx.textAlign = "left"; }

@@ -51,3 +51,9 @@ body.mk-open #hud,body.mk-open #bar,body.mk-open #bark,body.mk-open #hint{visibi
 body.touch .mk-btn{min-height:52px;font-size:19px}
 body.touch .mk-btn.sq{width:64px;height:64px}
 @media (max-width:900px){.mk-stats{gap:var(--sp3);font-size:14px}.mk-top{width:calc(100% - 112px)}.mk-val b{font-size:32px}}
+/* T6: Grisby's board and the break-even cell */
+.mk-gboard{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;margin-top:8px;padding:8px 10px;background:#f1d9a6;border:2px solid #9b2335;border-radius:6px;font-size:14px}
+.mk-gboard b{font-family:var(--font-num,monospace)}.mk-gboard .bad{color:#9b2335;font-weight:bold}
+.mk-be{margin:8px 0;padding:8px 10px;background:#f1d9a6;border:2px solid #2f6f62;border-radius:6px;font-size:14px;line-height:1.5}
+.mk-be input{min-height:44px;width:84px;font-size:16px;margin:0 6px;padding:0 8px;border:2px solid #7a4a22;border-radius:6px}
+.mk-be .mk-btn{min-height:44px}.mk-be .good{color:#2f6f62;font-weight:bold}.mk-be .bad{color:#9b2335}

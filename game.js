@@ -368,8 +368,16 @@
     const arrow = p => p > now ? " ▲" : p < now ? " ▼" : "";
     const tip = !top ? "" : top.price > now ? `Prices are heading up: ${top.price} by day ${top.day}. Grain you don't have to ship before then could fetch more.` : top.price < now ? "Prices are slipping. Better to ship what you've promised and not hold surplus." : "Prices hold steady.";
     const text = `<b>Village notices</b><br>Going price today: <b>${now}</b> a sack.<br>${o.length ? o.map(x => `Day ${x.day}: ${x.price}${arrow(x.price)}`).join(" · ") : "The season is nearly over."}<br><i>${tip}</i>${n ? `<br><br><b>${n.title}</b><br>${n.text}` : ""}`;
-    const opts = n ? n.options.map((label, i) => [label, () => { const r = act(() => S.answerNotice(s, i)); say(r.ok ? "maud" : null, r.ok ? noticeLesson(n.id, r.msg) : r.msg); }]) : [];
+    const opts = n ? n.options.map((label, i) => [label, () => { const f0 = n.id === "frost" ? frostRead() : null, r = act(() => S.answerNotice(s, i)); if (r.ok && f0) { if (f0.ruin === (r.msg === "covered")) TR.master("ev", s.day); say("maud", frostLesson(f0, r.msg)); } else say(r.ok ? "maud" : null, r.ok ? noticeLesson(n.id, r.msg) : r.msg); }]) : [];
     say(null, text, opts.concat([["Close", null]]));
+  }
+  // The frost almanac (expected value vs ruin): the numbers read BEFORE the choice, the lesson revealed after it. Ruin = losing the crops would worsen the Crown verdict.
+  const verdictRank = (f, net) => { const gap = net - f.crown; return gap >= 0 ? 3 : gap + f.hoped >= 0 ? 2 : gap >= -S.R.bridgeMax ? 1 : 0; };
+  function frostRead() { const f = S.frostFacts(s), cf = S.crownFund(s); return Object.assign({}, f, { net: cf.net, crown: cf.crown, ruin: verdictRank(cf, cf.net - f.atRisk) < verdictRank(cf, cf.net) }); }
+  function frostLesson(f, msg) {
+    const avg = `${f.atRisk} at 1 in 3 is ${f.ev} on average, against the straw's ${f.cover}`;
+    return msg === "covered" ? `Straw was ${f.cover} for certain; risking it was ${f.ev} on average. ${f.ruin ? "But losing the crops would have cost you your Crown verdict, so certainty was worth the difference." : "On average that was dearer, but you bought certainty."}`
+      : `${avg}, so on average the gamble is cheaper. ${f.ruin ? `But losing the crops would leave the Crown fund at ${f.net - f.atRisk} against ${f.crown}, and an average doesn't save you on the bad night.` : "A loss would hurt, not sink you, so taking the cheaper average is defensible."}`;
   }
   function noticeLesson(id, msg) { // revealed after the choice, never before: the lesson lands because the player committed first
     return ({ tinker: { blind: "Two of the six were mouldy. You paid 60 for four good packets: 15 each, dearer than Tomas. A bargain you can't inspect isn't a bargain. The write-off is in the Ledger as a loss, and the 12 you saved shows up against Cost of goods sold.", inspected: "Smart: you paid 5 to learn two were mouldy, then bought only the four good ones for 40. The fee is an operating expense; the inspection made the cheap seed cheaper than Tomas's." , pass: "Fine. Tomas's seed costs more but you can trust it." },

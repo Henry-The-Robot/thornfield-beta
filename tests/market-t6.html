@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Market Day T6</title></head><body><pre id="out">running</pre>
+<!-- T6/T6b through the real UI: the break-even cell, the opportunity-cost floor bet after the first fair, Grisby's board and sell-out in week 3, stricter transcript credit,
+     Maud's bet refunded when a fair is quit part-way, and the frost almanac on the notice board.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=90000 --dump-dom tests/market-t6.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.style.cssText = "width:1194px;height:834px;border:0"; f.src = "../game.html?sandbox&new=1&touch=0"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(500);
+  const w = f.contentWindow, d = w.document, G = w.G, S = w.Spring, M = w.Market, s = G.s, errs = []; w.addEventListener("error", e => errs.push(e.message)); G.closeDlg(); G.hidePanel(); w.localStorage.removeItem("lc_transcript_v2");
+  const click = id => { const b = d.getElementById(id); if (!b) throw new Error("no " + id + " in " + d.getElementById("mkt").textContent.slice(0, 100)); b.click(); }, P = t => out.push(t), btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), txt = () => d.getElementById("dlg").textContent;
+  const give = n => { s.bal.cash += n; s.bal.capital -= n; }, stock = n => { S.post(s, "seed", "test: sacks", { inv: 4 * n, cash: -4 * n }); s.sacks += n; };
+  // ---- day 7: the first fair, with a price change that RAISES takings
+  s.day = 7; give(300); stock(40); G.hud(); M.open(); await sleep(40); const st = M.debug.st; for (let i = 0; i < 3; i++) d.querySelector('[data-st="price-"]').click(); for (let i = 0; i < 14; i++) d.querySelector('[data-st="bring+"]').click(); click("mk-open"); await sleep(30); click("mk-fast"); await sleep(30);
+  d.querySelector('[data-st="price+"]').click(); d.querySelector('[data-st="price+"]').click(); click("mk-next"); await sleep(30); click("mk-next"); await sleep(60);
+  P(`tally reached: ${st.phase === "tally"}; hour takings ${st.f.hours.map(h => h.price + "->" + h.revenue).join(", ")}; experiment that worked: ${M.experiment(st.f)}`);
+  const be = d.getElementById("mk-be"); P(`the break-even cell is in the tally: ${!!be} [${be && be.textContent.replace(/\s+/g, " ").slice(0, 150)}]`);
+  const t = M.totals(st.f), avg = Math.round(t.revenue / t.units), keep = avg - 4, bill = S.weekBills(s), want = Math.ceil(bill / keep);
+  d.getElementById("mk-be-in").value = String(want + 3); click("mk-be-ok"); await sleep(30); P(`a wrong answer gets a nudge, no answer given: ${/Not quite/.test(d.getElementById("mk-be").textContent) && !d.getElementById("mk-be").textContent.includes(`It's ${want}`)}`);
+  d.getElementById("mk-be-in").value = String(want); click("mk-be-ok"); await sleep(30);
+  P(`second try right (${want} = ceil(${bill} / ${keep})): the cell closes: ${!d.getElementById("mk-be-in")}; no credit after a miss: ${w.Transcript.state("breakeven") === "unseen"}`);
+  P(`stricter credit: demand ${w.Transcript.state("demand")}, segments ${w.Transcript.state("segments")} (this fair raised takings with a price change, so it counts)`);
+  click("mk-done"); await sleep(150);
+  P(`after the first fair Ashby's cash offer and Maud's floor bet appear: ${/Ashby|on the nail/.test(txt())}`); btns()[0].click(); await sleep(60);
+  P(`the bet asks for the lowest price worth taking, with a way to open the fair's takings: ${/lowest price worth taking/.test(txt()) && btns().some(b => /fair's takings/.test(b.textContent))} (want ${w.__want})`);
+  d.getElementById("num").value = String(w.__want); btns().find(b => /Place my bet/.test(b.textContent)).click(); await sleep(60);
+  btns().find(b => /No stake/.test(b.textContent)).click(); await sleep(80);
+  P(`right: Maud names the real floor (the best sale you give up): ${/real floor/.test(txt())} [${txt().replace(/\s+/g, " ").slice(0, 150)}]`); btns()[0].click(); await sleep(40);
+  P(`opportunity cost earns transcript evidence: ${w.Transcript.evidence("opportunity").length > 0}; it happens once (floorBet recorded): ${!!s.market.floorBet}`); G.closeDlg();
+  // ---- stricter credit: the same price all afternoon earns nothing
+  w.Transcript.reset(); s.day = 14; G.hud(); M.open(); await sleep(40); const st2 = M.debug.st; click("mk-open"); await sleep(30);
+  P(`day 14 offers Maud's bet: ${st2.phase === "bet"}`); const c14 = s.bal.cash; d.querySelector('[data-bet="up"]').click(); await sleep(30); const bet = s.market.bet;
+  P(`the stake is posted (Cash ${c14} -> ${s.bal.cash}); Grisby's stock is announced (${st2.f.gStock0} sacks)`);
+  // quit part-way: play hour 1, then leave
+  click("mk-fast"); await sleep(30); M.close(); await sleep(30); s.day = 15; G.hud(); await sleep(30);
+  P(`a fair quit after one hour: the bet is refunded next morning (settled "${bet.settled}"; Cash ${s.bal.cash}); the books still balance: ${S.balanceSheet(s.bal).assets === S.balanceSheet(s.bal).liab + S.balanceSheet(s.bal).equity}; no transcript credit for a half fair: ${w.Transcript.state("demand") === "unseen"}`);
+  // ---- day 21: Grisby runs out
+  s.day = 21; stock(30); G.hud(); M.open(); await sleep(40); const st3 = M.debug.st; click("mk-open"); await sleep(30);
+  const pr = S.marketPrice(21) + 1; while (st3.f.hour < 1 || true) { if (st3.phase === "walk") click("mk-fast"); await sleep(25); if (st3.phase === "pause") { d.querySelectorAll('[data-st="price+"]').length; if (st3.price !== pr) { d.querySelector('[data-st="price+"]').click(); } if (st3.f.hour >= 3) break; click("mk-next"); } else if (st3.phase === "tally") break; if (st3.f.hour >= 3 && st3.phase !== "walk") break; }
+  P(`day 21: Grisby brought ${st3.f.gStock0} sacks, sold ${st3.f.gStock0 - st3.f.gStock}, ran out: ${st3.f.gStock === 0} (hours: ${st3.f.hours.map(h => h.grisbyOut ? "out" : h.toGrisby + " sold").join(", ")})`);
+  P(`his board is on screen (hour pause or tally): ${/Grisby's board/.test(d.getElementById("mkt").textContent) || st3.phase === "tally"}`);
+  M.close(); await sleep(20);
+  // ---- the frost almanac on the notice board
+  const s2 = G.s; s2.day = 23; s2.events = { 24: "frost" }; s2.plots.forEach((p, i) => { if (i < 6 && !p.crop) { p.tilled = true; p.crop = { age: 1, cost: 12 }; } }); G.hud(); G.noticeBoard(); await sleep(60);
+  P(`the almanac is on the board with the odds and the straw price: ${/almanac/i.test(txt()) && /1 in 3/.test(txt()) && /straw/i.test(txt())} [${btns().map(b => b.textContent.replace(/^\d/, "")).join(" | ")}]`);
+  const c0 = s2.bal.cash; btns().find(b => /Cover every plot/.test(b.textContent)).click(); await sleep(60);
+  P(`covering costs Cash (${c0} -> ${s2.bal.cash}) and Maud works out the average against the certain price: ${/on average|dearer|cost you your Crown/.test(txt())} [${txt().replace(/\s+/g, " ").slice(0, 200)}]`);
+  P(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
+} catch (e) { out.push("THROWN " + e.message + " " + (e.stack || "").split("\n")[1]); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>

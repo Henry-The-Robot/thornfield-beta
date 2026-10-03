@@ -40,7 +40,7 @@ ok([7, 14, 21].every(d => M.isDay(d, {})) && !M.isDay(8, {}) && M.isDay(28, {}) 
   const sc = game(7, 12); ok(M.flat(sc, 10, 12).revenue > M.flat(sc, 8, 12).revenue, "with only 12 sacks, 10 earns more than 8: scarcity says charge more"); }
 
 // ---- Grisby's rule ----
-{ ok(M.grisbyPrice(8, 9) === 8 && M.grisbyPrice(8, 10) === 9 && M.grisbyPrice(8, 14) === 13, "Grisby undercuts by 1 when you are above the going price");
+{ ok(M.grisbyPrice(8, 9) === 7 && M.grisbyPrice(8, 10) === 8 && M.grisbyPrice(8, 14) === 12 && M.grisbyPrice(5, 6) === 5, "Grisby undercuts by 2 when you are above the going price (never below cost + 1)");
   ok(M.grisbyPrice(8, 8) === 8 && M.grisbyPrice(8, 7) === 8 && M.grisbyPrice(8, 4) === 8, "Grisby holds at the going price when you are at it or below it");
   ok(!M.grisbyIn(7) && M.grisbyIn(14) && M.grisbyIn(21) && M.grisbyIn(28), "Grisby sets up a stall from week 2 (day 14), not on day 7");
   const f7 = M.newFair(game(7, 30)), f14 = M.newFair(game(14, 30)); ok(f7.grisby === false && f14.grisby === true, "the fair on day 7 has no rival; day 14 has");
@@ -48,13 +48,36 @@ ok([7, 14, 21].every(d => M.isDay(d, {})) && !M.isDay(8, {}) && M.isDay(28, {}) 
   ok(M.decide(th, 10, 9, 5).to === "grisby" && M.decide(th, 10, 9, 5).react === "bought", "a thrifty villager who sees both buys from the cheaper stall (Grisby)");
   ok(M.decide(th, 9, 9, 5).to === "me", "a tie stays with you");
   ok(M.decide(co, 10, 9, 5).to === "me" && M.decide(hu, 10, 9, 5).to === "me", "comfortable and hurried villagers don't comparison-shop: they stay with you");
-  const s = game(14, 30), f = M.newFair(s), h = M.playHour(f, 10); ok(h.grisbyPrice === 9 && h.toGrisby >= 0, "the hour record carries Grisby's price after seeing yours");
+  const s = game(14, 30), f = M.newFair(s), h = M.playHour(f, 10); ok(h.grisbyPrice === 8 && h.toGrisby >= 0, "the hour record carries Grisby's price after seeing yours");
   const noRival = M.flat(game(7, 60), 9, 60), rival = M.flat(game(14, 60), 9, 60); ok(rival.toGrisby > 0, `at 9 (1 over the going price) Grisby takes thrifty sales from you (${rival.toGrisby} sacks)`); ok(noRival.toGrisby === 0, "with no rival nothing goes to Grisby");
   ok(rival.stolen > 0 && rival.stolen <= rival.toGrisby, `'stolen' counts only villagers who'd have paid your price (${rival.stolen} of ${rival.toGrisby} sacks he sold)`);
   { const w = M.flat(game(7, 60), 9, 60), g = M.flat(game(14, 60), 9, 60); ok(g.revenue < w.revenue, `at 9 with 60 sacks Grisby costs you real takings (${g.revenue} vs ${w.revenue} with no rival)`);
     const hi = M.flat(game(14, 60), 11, 60), hi0 = M.flat(game(7, 60), 11, 60); ok(hi.revenue === hi0.revenue, "at 11 nobody thrifty would have paid you anyway, so he costs you nothing: a higher price escapes him"); }
   const at = p => M.flat(game(14, 60), p, 60).toGrisby; ok(at(8) === 0 && at(6) === 0, "at or under the going price Grisby holds and takes nothing (ties stay with you)"); }
 
+// ---- T6: Grisby has a limited stock, and in week 3 he runs out ----
+{ const f14 = M.newFair(game(14, 60)), f21 = M.newFair(game(21, 60)); ok(f14.gStock0 === 24 && f21.gStock0 === 5 && M.newFair(game(7, 60)).gStock0 === 0, "Grisby brings 24 sacks on day 14, only 5 on day 21, and nothing on day 7");
+  const f = M.newFair(game(21, 60)); const hs = [0, 1, 2].map(() => M.playHour(f, 9)); const took = hs.reduce((a, h) => a + h.toGrisby, 0);
+  ok(took <= 5 && took === 5 - f.gStock, `Grisby's sales never exceed his stock (sold ${took} of 5)`);
+  ok(hs.some(h => h.grisbyOut) && hs[0].grisbyOut === false, `he sells out part-way through the afternoon (hours out: ${hs.map(h => h.grisbyOut ? "out" : "open").join(", ")})`);
+  const out = hs.find(h => h.grisbyOut), noRival = M.playHour(M.newFair(game(7, 60), {}), 10); void noRival; ok(out.toGrisby === 0 && out.grisbyPrice === null, "once he is out nothing goes to him and his board shows no price");
+  const a = M.flat(game(21, 60), 9, 60), b = M.flat(game(14, 60), 9, 60); ok(a.toGrisby <= 5 && b.toGrisby > a.toGrisby, `week 2's Grisby sells ${b.toGrisby} sacks at 9, week 3's runs dry after ${a.toGrisby}`); }
+// ---- T6b: only a price change that RAISED takings counts as an experiment ----
+{ const s = game(7, 60), mk = prices => { const f = M.newFair(s); prices.forEach(p => M.playHour(f, p)); return f; };
+  const f1 = mk([8, 8, 8]), f2 = mk([8, 10, 9]); let raised = null; for (const trio of [[8, 9, 10], [10, 9, 8], [6, 8, 10], [10, 8, 6], [9, 10, 11], [12, 10, 8]]) { const f = mk(trio); if (M.experiment(f)) { raised = trio; break; } }
+  ok(!M.experiment(f1), "the same price all afternoon is not an experiment");
+  const worse = (() => { for (const a of [5, 6, 7, 11, 12, 13]) for (const b of [5, 6, 7, 8, 9, 10, 11, 12, 13]) { if (a === b) continue; const f = mk([a, b, b]); if (f.hours[1].revenue <= f.hours[0].revenue) return f; } return null; })();
+  ok(worse && !M.experiment(worse), `a changed price that did NOT raise takings is not an experiment either (${worse && worse.hours.map(h => h.price + "->" + h.revenue).join(", ")})`);
+  ok(raised && M.experiment(mk(raised)), `a change that raised takings counts (${raised})`); void f2; }
+// ---- T6b: Maud's bet is settled on every path ----
+{ const mkb = (guess, answer) => { const s = game(14, 18); s.market = { fairs: [], named: false, bet: { day: 14, guess, answer, now: 5, then: 6, price: 9, stake: 2 } }; S.wager(s, 2, "Maud's bet on your fair price"); return s; };
+  let s = mkb("up", "up"); ok(M.settleBet(s) === null, "before the fair is played the bet is left alone");
+  const full = s2 => { s2.market.fairs.push({ day: 14, points: [{}, {}, {}] }); return s2; };
+  s = full(mkb("up", "up")); const c0 = s.bal.cash; ok(M.settleBet(s) === "won" && s.bal.cash === c0 + 4 && s.market.bet.settled === "won", "a finished fair with the right guess pays the stake back twice over");
+  s = full(mkb("up", "down")); const c1 = s.bal.cash; ok(M.settleBet(s) === "lost" && s.bal.cash === c1, "a wrong guess keeps the stake");
+  s = mkb("up", "up"); s.market.fairs.push({ day: 14, points: [{}] }); s.day = 15; const c2 = s.bal.cash; ok(M.settleBet(s) === "refunded" && s.bal.cash === c2 + 2, "quitting mid-fair refunds the stake (the next morning, or on reload)");
+  s = mkb("up", "up"); s.day = 15; const c3 = s.bal.cash; ok(M.settleBet(s) === "refunded" && s.bal.cash === c3 + 2, "a bet placed and the fair never started is refunded too");
+  const b = S.balanceSheet(s.bal); ok(b.assets === b.liab + b.equity && M.settleBet(s) === null, "the refund keeps the books balanced and settling twice does nothing"); }
 // ---- Maud's bet is computed from the same model ----
 { const s = game(14, 18); const b = M.betAnswer(s, 9, 18); ok(b.answer === (b.then > b.now ? "up" : b.then < b.now ? "down" : "same") && b.now === M.flat(s, 9, 18).revenue && b.then === M.flat(s, 10, 18).revenue, `the bet answer comes from the model (9 -> ${b.now}, 10 -> ${b.then}: takings ${b.answer})`);
   const s2 = game(14, 60); ok(M.betAnswer(s2, 8, 60).answer === "down" && M.betAnswer(game(14, 12), 8, 12).answer === "up", "the right answer changes with how much stock you brought (up with 12 sacks at 8, down with 60)"); }
