@@ -39,7 +39,7 @@
     ashby: { H: "#f0ece0", c: "#e79bb0", C: "#c97a91", l: "#8a6a5a" },
     hobb: { H: "#a86a32", c: "#f2efe6", C: "#cfcabb", l: "#6a5a48", e: "#e9b48a" },
     tomas: { H: "#d8742a", c: "#3f8f6f", C: "#2f6f55", l: "#5a4636" },
-    duke: { H: "#3a2a1a", c: "#8f2f3f", C: "#6d2230", l: "#d9b24a" },
+    corvin: { H: "#1a1a24", c: "#1f6a62", C: "#154a45", l: "#d9b24a", e: "#efd2b0" }, // WS6: Corvin Vane, the Duke's steward (replaces the generic Duke sprite); key "duke" stays in game state, aliased below
     mira: { H: "#2f2018", c: "#d9a83a", C: "#b8862b", l: "#5a4636", e: "#d9a07a" },
     abbey: { H: "#8a6a4a", c: "#6b5a48", C: "#54463a", l: "#54463a" },
     pell: { H: "#6a4a2a", c: "#b07a6a", C: "#8f5f50", l: "#4a3a2a", e: "#e0a888" },
@@ -76,6 +76,12 @@
     Object.keys(PEOPLE).forEach(k => ART.people[k] = person(PEOPLE[k]));
     // WS3: Crane carries a brown ledger under one arm (drawn onto his sprite frames: front/back at the right hip, sides in front)
     ["down", "up", "left", "right"].forEach(d => ART.people.crane[d].forEach((c, i) => { const x = c.getContext("2d"), side = d === "left" || d === "right"; x.fillStyle = P.k; x.fillRect(side ? 5 : 10, 10, 5, 7); x.fillStyle = "#8a4b3a"; x.fillRect(side ? 6 : 11, 11, 3, 5); x.fillStyle = "#e8d8a8"; x.fillRect(side ? 6 : 11, 11, 3, 1); }));
+    // WS6: Corvin Vane carries his office on him: a feathered cap, a gold chain with a seal across the coat, a rolled order under the arm
+    ["down", "up", "left", "right"].forEach(d => ART.people.corvin[d].forEach(c => { const x = c.getContext("2d"), side = d === "left" || d === "right";
+      x.fillStyle = P.k; x.fillRect(3, 1, 10, 3); x.fillStyle = "#2a2440"; x.fillRect(4, 1, 8, 2); x.fillStyle = P.Y; x.fillRect(4, 3, 8, 1); x.fillStyle = "#d9534f"; x.fillRect(side ? 3 : 11, 0, 2, 3); // cap, gold band, red feather
+      if (d !== "up") { x.fillStyle = P.y; x.fillRect(side ? 6 : 5, 10, side ? 3 : 6, 1); x.fillStyle = P.Y; x.fillRect(7, 11, 2, 2); x.fillStyle = "#9b2335"; x.fillRect(7, 12, 2, 1); } // chain + wax seal
+      x.fillStyle = "#f4ead0"; x.fillRect(side ? 5 : 11, 9, 2, 6); x.fillStyle = P.k; x.fillRect(side ? 5 : 11, 9, 2, 1); })); // the rolled order
+    ART.people.duke = ART.people.corvin;
     ART.chest = sprite(CHEST);
     ART.crops = CROPS.map(r => sprite(r)); ART.crate = sprite(CRATE); ART.sprinkler = sprite(SPRINKLER); ART.sack = sprite(SACK);
     ART.tree = [0, 1, 2].map(i => tree(70 + i)); ART.bush = bush(90);

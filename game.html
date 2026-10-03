@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#1f2a1a"><meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Ledger & Crown — Spring at Thornfield</title>
-<link rel="stylesheet" href="style.css?v=0.3.2"><link rel="stylesheet" href="verbs.css?v=0.3.2">
+<link rel="stylesheet" href="style.css?v=0.4.0"><link rel="stylesheet" href="verbs.css?v=0.4.0">
 <style>
   body{background:#1f2a1a;overflow:hidden;user-select:none}
   #wrap{position:relative;margin:0 auto}
@@ -91,7 +91,7 @@
   body.touch .modal{max-height:92dvh;padding:18px 18px;-webkit-overflow-scrolling:touch}
   body.touch .pclose{min-height:46px}
 </style>
-<link rel="stylesheet" href="ui.css?v=0.3.2"><style>html body{background:#1f2a1a} /* ui.css sets a parchment page colour; the game is dark so no light bars show round the map */</style></head>
+<link rel="stylesheet" href="story.css?v=0.4.0"><link rel="stylesheet" href="ui.css?v=0.4.0"><style>html body{background:#1f2a1a} /* ui.css sets a parchment page colour; the game is dark so no light bars show round the map */</style></head>
 <body>
 <div id="wrap">
   <canvas id="c" width="320" height="200"></canvas>
@@ -106,7 +106,8 @@
 </div>
 <div class="overlay" id="panel" style="display:none"><div class="modal" id="panelBody"></div></div>
 <!-- ?v= busts browser caches on every release (Safari otherwise mixes old scripts with a new page); bump it each release -->
-<script src="codex.js?v=0.3.2"></script>
-<script src="engine.js?v=0.3.2"></script><script src="books.js?v=0.3.2"></script><script src="transcript.js?v=0.3.2"></script>
-<script src="art.js?v=0.3.2"></script><script src="bot.js?v=0.3.2"></script><script src="fx.js?v=0.3.2"></script><script src="verbs.js?v=0.3.2"></script><script src="story.js?v=0.3.2"></script><script src="game.js?v=0.3.2"></script>
+<script src="endings.js?v=0.4.0"></script><!-- WS6: offer price, epilogues, unlocks (pure; resolves Spring/Bot lazily) -->
+<script src="codex.js?v=0.4.0"></script>
+<script src="engine.js?v=0.4.0"></script><script src="books.js?v=0.4.0"></script><script src="transcript.js?v=0.4.0"></script>
+<script src="art.js?v=0.4.0"></script><script src="bot.js?v=0.4.0"></script><script src="fx.js?v=0.4.0"></script><script src="verbs.js?v=0.4.0"></script><script src="story.js?v=0.4.0"></script><script src="game.js?v=0.4.0"></script>
 </body></html>

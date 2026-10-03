@@ -1,0 +1,44 @@
+/* WS6 story spine: week title cards, the name-your-farm card, Crane's offer card, the case board, the ending epilogue.
+   Own file so it merges cleanly beside style.css / verbs.css / market.css. Uses the game's wood-panel look (see game.html). */
+.wkcard{position:absolute;left:50%;top:108px;transform:translateX(-50%);z-index:60;width:min(520px,90%);text-align:center;padding:12px 18px 10px;cursor:pointer;
+  background:#f1d9a6;border:3px solid #7a4a22;box-shadow:inset 0 0 0 2px #d9a55e,0 4px 0 #4a2c14,0 0 0 9999px rgba(20,16,10,.28);border-radius:8px;color:#3b2a1e;font-family:var(--serif);animation:wkin .5s ease-out}
+.wkcard .wk-farm{font:11px var(--serif);letter-spacing:.14em;text-transform:uppercase;color:#7a5a3a}
+.wkcard .wk-n{font:12px var(--serif);color:#9b2335;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.wkcard .wk-t{font:bold 30px var(--serif);margin:2px 0 4px}
+.wkcard .wk-l{font:italic 16px var(--serif);margin-bottom:6px}
+.wkcard .wk-m{font:14px var(--serif);border-top:1px dotted #9a6a3a;padding-top:6px}.wkcard .wk-m b{color:#7a2a1a}
+.wkcard .wk-tap{font:11px var(--serif);color:#9a7a5a;margin-top:4px}
+@keyframes wkin{from{opacity:0;transform:translate(-50%,-14px)}}
+body.touch .wkcard{top:calc(122px + env(safe-area-inset-top));min-height:44px}
+
+/* overlays that take the whole screen: name your farm, an ending */
+.s6ov{position:fixed;inset:0;z-index:70;background:rgba(20,16,10,.72);display:flex;align-items:center;justify-content:center}
+.s6ov .s6card{width:min(560px,92%);max-height:90%;overflow:auto;padding:18px 22px;text-align:center;background:#f1d9a6;border:3px solid #7a4a22;box-shadow:inset 0 0 0 2px #d9a55e,0 4px 0 #4a2c14;border-radius:8px;color:#3b2a1e;font-family:var(--serif)}
+.s6card h2{margin:0 0 6px;font:bold 26px var(--serif);border:0;color:#3b2a1e}
+.s6card p{font:16px var(--serif);line-height:1.4;margin:6px 0}
+.s6card .s6sub{font:12px var(--serif);letter-spacing:.12em;text-transform:uppercase;color:#9b2335}
+.s6card input[type=text]{font:20px var(--serif);width:80%;padding:8px 10px;border:2px solid #9a6a3a;border-radius:4px;background:#fffdf5;text-align:center;min-height:44px}
+.s6card button{font:16px var(--serif);background:#fff5dc;border:2px solid #9a6a3a;border-radius:4px;padding:8px 16px;margin:6px 6px 0;cursor:pointer;color:#3b2a1e;min-height:44px}
+.s6card button.gold{background:#ffcf3a}.s6card button:hover{background:#ffe3a0}
+.s6card .s6unlock{border:1px dashed #9a6a3a;background:#fff8e4;padding:6px 10px;font:italic 14px var(--serif);margin-top:8px}
+.s6card .s6price{font:bold 34px var(--mono);color:#7a2a1a;margin:4px 0}
+.s6card .s6cmp{display:flex;gap:10px;justify-content:center;margin:8px 0}
+.s6card .s6cmp div{flex:1;background:#fff8e4;border:1px solid #9a6a3a;border-radius:4px;padding:6px}.s6card .s6cmp b{display:block;font:bold 22px var(--mono)}
+.s6end-sold h2{color:#7a2a1a}.s6end-seized h2{color:#9b2335}.s6end-bridged h2{color:#8a6a1a}.s6end-free h2{color:#2f6f3a}
+
+/* the case board: a corkboard of pinned clue cards */
+.corkboard{background:#b98f5a;background-image:radial-gradient(#a57a46 1px,transparent 1.5px);background-size:7px 7px;border:6px solid #6b4526;border-radius:6px;padding:14px;min-height:240px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.clue{position:relative;background:#fff8e4;color:#3b2a1e;padding:12px 10px 8px;border-radius:2px;box-shadow:2px 3px 0 rgba(60,40,20,.45);font-family:var(--serif)}
+.clue:nth-child(3n+1){transform:rotate(-1.4deg)}.clue:nth-child(3n+2){transform:rotate(1.1deg)}.clue:nth-child(3n){transform:rotate(-.5deg)}
+.clue:before{content:"";position:absolute;top:-6px;left:50%;margin-left:-6px;width:12px;height:12px;border-radius:50%;background:#c43a1a;box-shadow:0 2px 0 #7a2a1a}
+.clue.page{background:#f6ecd2;font-style:italic}.clue.book{background:#e8efd8}
+.clue .ct{font:bold 15px var(--serif);color:#9b2335}.clue .cn{font:15px var(--mono);margin:4px 0}.clue .cf{font:11px var(--serif);color:#7a5a3a}
+.cbempty{grid-column:1/-1;text-align:center;color:#f1e4c8;font:italic 16px var(--serif);padding:30px 0}
+#casebtn{pointer-events:auto;cursor:pointer;font:bold 14px var(--serif);min-height:30px}
+body.touch #casebtn{min-height:44px}
+/* timeline: the second line (tied up in sacks and invoices), and Ezra's rate beside Tomas's discount */
+.vtl-tied{font:11px var(--mono);color:#7a5a3a;border-top:1px dotted #9a6a3a;margin-top:2px;padding-top:2px;text-align:center}
+.vtl-legend{font:13px var(--serif);color:#5a3a1a;background:#f6ecd2;border-left:4px solid #9a6a3a;padding:4px 10px;margin:6px 0}
+.vtl-rate{font:14px var(--serif);background:#eef4ff;border-left:4px solid #5b7fc4;padding:6px 10px;margin:6px 0}.vtl-rate b.good{color:#2f6f3a}.vtl-rate b.bad{color:#9b2335}
+/* Crane's offer, as a card at the Desk */
+.offercard{border:2px solid #26262c;background:#2b2b33;color:#f1e4c8;padding:8px 12px;border-radius:4px;margin:6px 0;font:15px var(--serif)}.offercard b{color:#ffcf3a}

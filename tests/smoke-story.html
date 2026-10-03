@@ -13,9 +13,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 function load(q) { return new Promise(res => { const f = document.createElement("iframe"); f.style.width = "1280px"; f.style.height = "800px";
   f.onload = () => { f.contentWindow.addEventListener("error", e => errs.push(e.message)); res([f, f.contentWindow]); }; f.src = "../game.html" + q; document.getElementById("frames").appendChild(f); }); }
 const vis = el => el && el.offsetParent !== null && getComputedStyle(el).display !== "none";
-let tl = 0, tags = 0, typed = 0, boards = 0, picks = 0, haggles = 0;
+let tl = 0, tags = 0, typed = 0, boards = 0, picks = 0, haggles = 0, named = 0;
 function pump(w) { // do the one thing the screen is asking for; true if something was done
   const d = w.document, panel = d.getElementById("panel"), dlg = d.getElementById("dlg");
+  const nf = d.getElementById("nfok"); if (nf) { nf.click(); named++; return true; } // WS6: name your farm (keeps the default)
   if (panel.style.display !== "none") {
     const click = id => { const b = d.getElementById(id); if (b) { b.click(); return true; } };
     if (d.getElementById("tlLow") && w.__tl) { d.getElementById("tlLow").value = w.__tl.low; d.getElementById("tlDay").value = w.__tl.day; tl++; return click("tlok"); } // WS3 timeline
@@ -54,9 +55,11 @@ async function drive(w, until) {
       case "ashby3": G.talk("ashby"); break;
       case "hobb4": G.talk("hobb"); break;
       case "ship3": case "ship4": G.crate(); break;
-      case "sleep5": case "sleep8": G.sleepNow(); break;
+      case "sleep5": case "page8": G.sleepNow(); break;
+      case "sleep8": case "sleep9": w.Bot.careful.day(s); G.sleepNow(); break; // WS6: the days between the midpoint (day 12) and the squeeze (day 15) are played, not skipped
       case "ezra7": G.talk("ezra"); break;
-      case "duke8": G.talk("duke"); break;
+      case "duke8": case "duke9": G.talk("duke"); break;
+      case "tomas9": G.talk("tomas"); break;
       case "run9": w.Bot.careful.day(s); G.sleepNow(); break;
       case "done": return { seen };
     }
@@ -65,7 +68,7 @@ async function drive(w, until) {
 }
 (async () => {
   try {
-    const [f, w] = await load("?fast=1&savetest=1&new=1"); w.__fastVerbs = true; await sleep(150); w.localStorage.removeItem("lc_transcript_v1");
+    const [f, w] = await load("?fast=1&savetest=1&new=1&seed=3"); w.__fastVerbs = true; // WS6: a fixed seed keeps the drawn event days (and so this run) reproducible await sleep(150); w.localStorage.removeItem("lc_transcript_v1");
     // Every Try must be answerable and fully equipped: numeric answer and tolerance, docs list, working, Explain-how.
     const realAsk = w.G.ask, badAsks = []; w.G.ask = function (who, text, answer, hints, sp, tol, docs, work, how) {
       const why = [typeof answer !== "number" || isNaN(answer) ? "answer" : "", tol != null && typeof tol !== "number" ? "tol" : "", docs != null && !Array.isArray(docs) ? "docs" : "",
@@ -83,11 +86,12 @@ async function drive(w, until) {
     f2.remove();
     const r2 = await drive(w);
     if (r2.stopped) { log("stopped for screenshot at " + stopAt); document.getElementById("out").textContent = out.join("\n"); return; }
+    if (P.get("shotAfter") === "case") { w.G.hidePanel(); w.Story.caseBoard(); await sleep(300); document.getElementById("out").textContent = "case board shot"; return; } // screenshots: the real, fully played case board
     const st = w.Story.state, d = w.document;
     log(`chapters 6-9: stages ${r2.seen.join(" → ")}${r2.timeout ? " TIMEOUT" : ""}; outcome ${w.G.s.outcome} day ${w.G.s.day}`);
     if (r2.timeout) log(`STUCK: dlg=${JSON.stringify(d.getElementById("dlg").innerText.slice(0, 200))} display=${d.getElementById("dlg").style.display} panel=${d.getElementById("panel").style.display} ${JSON.stringify(d.getElementById("panelBody").innerText.slice(0, 120))} busy=${w.Story.busy} stage=${st.stage}`);
     log(`WS3: tag taps ${tags}, timeline panels ${tl}, bets pending/left ${JSON.stringify(w.G.s.bet || null)}, walkedOff ${w.G.s.walkedOff || "no"}`);
-    log(`Try beats answered ${typed}, forecast boards ${boards}, haggles ${haggles}, line picks ${picks}; notebook: ${st.notebook.map(n => n.term).join("; ")}; journal pages ${st.pages.length}/5`);
+    log(`Try beats answered ${typed}, forecast boards ${boards}, haggles ${haggles}, line picks ${picks}; notebook: ${st.notebook.map(n => n.term).join("; ")}; journal pages ${st.pages.length}/6`);
     log(`Ezra rate after the forecast: ${w.G.s.rateAdj} bp off; Duke order: ${(w.G.s.orders.find(o => o.who === "duke") || { sacks: "none", status: "" }).sacks} ${(w.G.s.orders.find(o => o.who === "duke") || {}).status || ""}`);
     log(`close: statements unveiled ${d.querySelectorAll("#panelBody .veil").length === 0}, reconciles ${/reconciles ✓/.test(d.getElementById("panelBody").textContent)}, Ezra button ${!!d.getElementById("goEzra")}`);
     const tr = w.Transcript, all = Object.values(tr.CONCEPTS).flat();
@@ -101,9 +105,17 @@ async function drive(w, until) {
     const road = [...d.querySelectorAll("#hud .deskonly")].length;
     log(`Desk/Road: ${road} desk-only HUD boxes hidden on the road`);
     log(`Try beats with a missing or misplaced setting: ${w.__badAsks.length} ${JSON.stringify(w.__badAsks)}`);
+    // WS6: the four-week frame, the case board, the name, the ribbon, the seeded events
+    log(`WS6 seed ${w.G.s.seed}: event nights ${JSON.stringify(w.G.s.events)} (stored in the save: ${!!JSON.parse(w.localStorage.getItem("lc_spring_save_v3") || "{}").s})`);
+    log(`WS6 weeks: cards shown for weeks ${JSON.stringify(st.weeks)}; farm "${st.farm}" (name overlay clicked ${named}x); ribbon "${d.getElementById("goal").textContent}"`);
+    log(`WS6 case board: ${st.clues.length} clues pinned: ${st.clues.map(c => c.id).join(", ")}; Crane's offer pinned ${st.clues.some(c => c.id === "offer")}; Crane=Vane clue absent (canon: he is only a messenger) ${!st.clues.some(c => c.id === "crane-vale")};Edric's page 6 pinned ${st.clues.some(c => c.id === "page5")}; case button "${(d.getElementById("casebtn") || {}).textContent}"`);
+    // every ending's epilogue is reachable through the ?ending= test hook
+    for (const k of ["sold", "seized", "bridged", "free"]) { const [fe, we] = await load(`?fast=1&new=1&ending=${k}`); await sleep(900);
+      const h2 = we.document.querySelector("#ending h2"), ps = we.document.querySelectorAll("#ending p").length, un = (we.document.querySelector("#ending .s6unlock") || {}).textContent || "";
+      log(`ending ?ending=${k}: "${h2 && h2.textContent}", ${ps} lines, unlock "${un.slice(0, 48)}…"`); fe.remove(); }
   } catch (e) { log("FAIL " + e.message + " " + e.stack); }
   log(`JS errors: ${errs.length} ${JSON.stringify(errs)}`);
   document.getElementById("out").textContent = "RESULTS\n" + out.join("\n");
-  document.getElementById("frames").innerHTML = "";
+  document.getElementById("frames").innerHTML = ""; document.querySelectorAll("script").forEach(x => x.remove()); // keep the --dump-dom output short
 })();
 </script></body></html>

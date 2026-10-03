@@ -22,7 +22,7 @@ window.Verbs = (function () {
   const P = { assets: [], liab: [], aTot: null, lTot: null, eq: null, hint: "", on: false }; // on: the parchment is part of a lesson right now; nothing may re-create it once it is closed
   function parchHtml() {
     const rows = a => a.map(r => `<div class="vp-row"><span>${r.line}</span><b>${fmt(r.value)}</b></div>`).join("");
-    return `${tagSt ? "" : `<button type="button" class="vp-x" aria-label="Close this page">✕</button>`}<h4>Thornfield, as the Crown sees it</h4><div class="vp-sec">Assets <span style="font-weight:normal;font-size:13px">(what the farm owns)</span></div>${rows(P.assets)}${P.aTot != null ? `<div class="vp-tot"><span>Total assets</span><b>${fmt(P.aTot)}</b></div>` : ""}` +
+    return `${tagSt ? "" : `<button type="button" class="vp-x" aria-label="Close this page">✕</button>`}<h4>${P.title || "Thornfield"}, as the Crown sees it</h4><div class="vp-sec">Assets <span style="font-weight:normal;font-size:13px">(what the farm owns)</span></div>${rows(P.assets)}${P.aTot != null ? `<div class="vp-tot"><span>Total assets</span><b>${fmt(P.aTot)}</b></div>` : ""}` +
       (P.liab.length ? `<div class="vp-sec">Liabilities <span style="font-weight:normal;font-size:13px">(what it owes)</span></div>${rows(P.liab)}${P.lTot != null ? `<div class="vp-tot"><span>Total liabilities</span><b>${fmt(P.lTot)}</b></div>` : ""}` : "") +
       (P.eq != null ? `<div class="vp-tot"><span>Owner's equity</span><b class="${P.eq < 0 ? "vp-neg" : ""}">${fmt(P.eq)}</b></div>` : "") + (P.hint ? `<div class="vp-hint">${P.hint}</div>` : "") +
       (P.where ? `<button type="button" class="vp-where">Where else?</button>` : "");
@@ -142,7 +142,13 @@ window.Verbs = (function () {
     const s = G.s, rows = S_.forecast(s, cfg.n || 14, cfg.extra).map(r => Object.assign({}, r)), b = cfg.bill;
     if (b && moved != null) { const home = rows.find(r => r.day === Math.max(s.day, b.due)); if (home) { home.bills -= b.amount; home.cout -= b.amount; }
       const to = rows.find(r => r.day === moved), amt = moved <= b.discBy ? b.amount - b.disc : b.amount; if (to) { to.bills += amt; to.cout += amt; to.mine = amt; } }
-    let cash = rows.length ? rows[0].open : 0; rows.forEach(r => { r.open = cash; cash = cash + r.cin - r.cout; r.close = cash; }); return rows;
+    let cash = rows.length ? rows[0].open : 0; rows.forEach(r => { r.open = cash; cash = cash + r.cin - r.cout; r.close = cash; });
+    // WS6: cfg.tied adds a second line beside Cash: what is tied up in sacks and invoices (receivables + inventory - payables).
+    // Seed bought today (cfg.extra) becomes inventory; an invoice paid lowers it; a bill paid raises it (payables fall);
+    // cfg.order = {sacks, price, due}: delivering a big order on terms turns its sacks (at cost) into a receivable at the price.
+    if (cfg.tied) { const bs = Spring.balanceSheet(s.bal), o = cfg.order; let tied = bs.ar + bs.inv - bs.ap + (cfg.extra || 0);
+      rows.forEach(r => { tied += r.bills - r.cin; if (o && r.day === o.due) tied += o.sacks * (o.price - Spring.R.unitCost); r.tied = tied; }); }
+    return rows;
   }
   const S_ = { forecast: (s, n, x) => Spring.forecast(s, n, x) };
   function tlHtml(cfg, rows, st) {
@@ -158,8 +164,9 @@ window.Verbs = (function () {
       if (r.bills && !(r.mine)) cards.push(`<div class="vtl-card out">−${r.bills} Tomas</div>`);
       if (r.fines) cards.push(`<div class="vtl-card out">−${r.fines} forfeit</div>`);
       if (r.mine) cards.push(`<div class="vtl-card move" data-move="1">Tomas −${r.mine}${r.mine < cfg.bill.amount ? ` (saves ${cfg.bill.amount - r.mine})` : ""}</div>`);
-      return `<div class="vtl-day${r.day === G.s.day ? " today" : ""}${st.sel === r.day ? " sel" : ""}" data-day="${r.day}"><span class="d">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][(r.day - 1) % 7]} ${r.day}</span>${cards.join("")}${st.hide ? "" : `<div class="vtl-cash${r.close < 0 ? " neg" : ""}">${r.close}</div>`}</div>`; }).join("");
-    return `<div class="vtl"><h1>${cfg.title || "Your next two weeks"}</h1>${cfg.maud ? `<div class="maudline"><b>Maud:</b> ${cfg.maud}</div>` : ""}${svg}<div class="vtl-grid" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${cols}</div><div class="vtl-sum" id="vtlsum">${st.sum || ""}</div>${st.foot || ""}</div>`;
+      return `<div class="vtl-day${r.day === G.s.day ? " today" : ""}${st.sel === r.day ? " sel" : ""}" data-day="${r.day}"><span class="d">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][(r.day - 1) % 7]} ${r.day}</span>${cards.join("")}${st.hide ? "" : `<div class="vtl-cash${r.close < 0 ? " neg" : ""}">${r.close}</div>`}${cfg.tied && !st.hide ? `<div class="vtl-tied" title="tied up in sacks and invoices">${r.tied}</div>` : ""}</div>`; }).join("");
+    const legend = cfg.tied && !st.hide ? `<div class="vtl-legend"><b>Top number:</b> Cash. <b class="t">Small number:</b> tied up in sacks and invoices (receivables + inventory − payables). It grows with sales and only comes back when growth stops.</div>` : "";
+    return `<div class="vtl"><h1>${cfg.title || "Your next two weeks"}</h1>${cfg.maud ? `<div class="maudline"><b>Maud:</b> ${cfg.maud}</div>` : ""}${legend}${svg}<div class="vtl-grid" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${cols}</div><div class="vtl-sum" id="vtlsum">${st.sum || ""}</div>${st.foot || ""}</div>`;
   }
   function timeline(cfg) {
     return new Promise(res => {
@@ -180,7 +187,7 @@ window.Verbs = (function () {
         if (cfg.mode === "show") { f.innerHTML = `<button class="btn gold" id="tlok">Got it</button>`; $("tlok").onclick = () => { G.hidePanel(); res({}); }; }
         else if (cfg.mode === "play") {
           const low = rows.reduce((a, r) => r.close < a.close ? r : a, rows[0]);
-          f.innerHTML = `<div class="vtl-sum">Lowest Cash on this plan: <b class="${low.close < 0 ? "neg" : ""}">${low.close}</b> on day ${low.day}. Drag the purple card, or tap a day.</div><button class="btn gold" id="tlok">Pay Tomas on day ${moved}</button>`;
+          f.innerHTML = `<div class="vtl-sum">Lowest Cash on this plan: <b class="${low.close < 0 ? "neg" : ""}">${low.close}</b> on day ${low.day}. Drag the purple card, or tap a day.</div>${cfg.footNote ? `<div class="vtl-rate">${cfg.footNote(moved)}</div>` : ""}<button class="btn gold" id="tlok">Pay Tomas on day ${moved}</button>`; // WS6: footNote = Ezra's rate beside the discount
           $("tlok").onclick = () => { G.hidePanel(); res({ day: moved, paidNow: moved === G.s.day, saved: moved <= cfg.bill.discBy ? cfg.bill.disc : 0, low: low.close }); };
           const card = document.querySelector("#panelBody .vtl-card.move"); if (card) card.onpointerdown = e => { e.preventDefault(); drag = true; try { card.setPointerCapture(e.pointerId); } catch (x) {}
             const over = ev => { const t = document.elementFromPoint(ev.clientX, ev.clientY), d = t && t.closest ? t.closest(".vtl-day") : null; document.querySelectorAll(".vtl-day.drop").forEach(x => x.classList.remove("drop")); if (d) d.classList.add("drop"); return d; };
@@ -198,6 +205,6 @@ window.Verbs = (function () {
     });
   }
 
-  return { init, remark, stamp, thud, parch, parchReset, parchClose, pinRow, countTotal, P, tag, canvasTap, draw, bet, revealBet, timeline, tapNext, tapDecoy, wait,
+  return { init, remark, stamp, thud, parch, parchReset, parchClose, pinRow, countTotal, P, tag, canvasTap, draw, bet, revealBet, timeline, rows: cfg => rowsFor(Object.assign({ n: 14 }, cfg)), tapNext, tapDecoy, wait,
     get tagging() { return !!tagSt; }, get craneOn() { return craneOn; }, set craneOn(v) { craneOn = v; }, fmt, el };
 })();
