@@ -99,7 +99,7 @@ window.Verbs = (function () {
     }
     window.__want = undefined;
     const cash = G.s.bal.cash, opts = []; for (let k = mn; k <= Math.min(mx, cash); k++) opts.push(k);
-    const pick = await G.dlg({ who: "maud", text: `You say <b>${guess}</b>. Stake some real coin on it? Right, and I pay you the stake again. Wrong, I keep it.`, choices: opts.map(k => k ? `Stake ${k}` : "No stake") });
+    const pick = await G.dlg({ who: "maud", text: `You say <b>${guess}</b>: stake some real coin on it? Right and I pay the stake again; wrong and I keep it.`, choices: opts.map(k => k ? `Stake ${k}` : "No stake") });
     const stake = opts[pick.i] || 0;
     if (stake) G.act(() => Spring.wager(G.s, stake, "Bet with Maud"));
     const b = { guess, stake, kind: cfg.kind || "bet", tol: cfg.tol || 0, base: G.s.journal.length, day: G.s.day };
@@ -119,10 +119,13 @@ window.Verbs = (function () {
     const b = G.s.bet; if (!b || G.s.day < b.revealDay) return null;
     const actual = G.s.bal.cash, extras = G.s.journal.filter(j => j.n > b.base && !PLANNED.has(j.type) && j.lines.cash), delta = extras.reduce((a, j) => a + j.lines.cash, 0), adj = actual - delta + b.stake; // the stake already left the chest when the bet was placed
     const win = Math.abs(b.guess - adj) <= b.tol; if (win) G.act(() => Spring.wagerWin(G.s, b.stake, "Bet with Maud"));
-    const why = extras.length ? `<br>The difference is yours: ${extras.map(j => `${j.memo.replace(/ \(.*$/, "")}: ${j.lines.cash > 0 ? "+" : "−"}${Math.abs(j.lines.cash)}`).join("; ")}. Without ${delta > 0 ? "them" : "them"} the chest would hold ${adj}.` : "";
+    const why = extras.length ? `The difference is yours: ${extras.map(j => `${j.memo.replace(/ \(.*$/, "")}: ${j.lines.cash > 0 ? "+" : "−"}${Math.abs(j.lines.cash)}`).join("; ")}. Without ${delta > 0 ? "them" : "them"} the chest would hold ${adj}.` : "";
     const pay = b.stake ? (win ? ` You win ${b.stake}.` : ` I keep your ${b.stake}.`) : "";
     G.s.bet = null; cardTick();
-    await G.dlg({ who: "maud", text: `<b>The bet.</b> You said ${b.guess} (day ${b.day}). The chest holds <b>${actual}</b>.${why}<br>${win ? "You read the books right." : `The books said ${adj}; you said ${b.guess}.`}${pay}${b.explain ? `<br><i>${b.explain}</i>` : ""}`, choices: ["Next"] });
+    await G.dlg({ who: "maud", text: `<b>The bet.</b> You said ${b.guess} on day ${b.day}, and the chest holds <b>${actual}</b>.`, choices: ["Next"] });
+    if (why) await G.dlg({ who: "maud", text: why.replace(/^<br>/, ""), choices: ["Next"] });
+    await G.dlg({ who: "maud", text: `${win ? "You read the books right." : `The books said ${adj}; you said ${b.guess}.`}${pay}`, choices: [b.explain ? "Next" : "Close"] });
+    if (b.explain) await G.dlg({ who: "maud", text: `<i>${b.explain}</i>`, choices: ["Next"] });
     return { win, guess: b.guess, actual, adj, stake: b.stake };
   }
   function cardTick() { // a small card in the HUD for a pending bet (drawn from G.s.bet; no hover needed)

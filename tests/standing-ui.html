@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Standing orders and the practice wager</title></head><body><pre id="out">running</pre>
+<!-- The notice board's standing orders (check, take, pass, verdict, evidence) and the optional wager on Maud's daily problem.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=60000 --dump-dom tests/standing-ui.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.style.cssText = "width:1180px;height:800px"; f.src = "../game.html?sandbox&new=1&touch=0"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(600);
+  const w = f.contentWindow, d = w.document, G = w.G, s = G.s, S = w.Spring, errs = []; w.addEventListener("error", e => errs.push(e.message)); G.closeDlg(); G.hidePanel();
+  const btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), txt = () => d.getElementById("dlg").textContent, click = re => { const b = btns().find(x => re.test(x.textContent)); if (!b) throw new Error("no " + re + " in " + btns().map(x => x.textContent) + " | " + txt().slice(0, 100)); b.click(); };
+  const give = to => { const d = to - s.bal.cash; if (d > 0) { s.bal.cash += d; s.bal.capital -= d; } }; // a test gift of Cash that keeps the books balanced
+  while (s.day < 9) S.sleep(s); give(300); s.offers.length = 0; G.hud();
+  const today = w.Standing.today(s), good = today.find(o => w.Standing.judge(s, o).well), trap = today.find(o => !w.Standing.judge(s, o).well);
+  out.push(`day ${s.day}: ${today.length} standing order(s) on the board [${today.map(o => o.kind).join(",")}]`);
+  G.noticeBoard(); await sleep(60); out.push(`the notice board lists them: ${btns().some(b => /Standing orders \(\d\)/.test(b.textContent))}`); click(/Standing orders/); await sleep(60);
+  out.push(`the board shows each as who, sacks, price, terms, due day: ${btns().filter(b => /sacks at/.test(b.textContent)).length === today.length} [${btns().map(b => b.textContent).join(" | ")}]`);
+  // pick a good one if there is one, else take the first
+  const pick = good || today[0], idx = today.indexOf(pick); btns().filter(b => /sacks at/.test(b.textContent))[idx].click(); await sleep(60);
+  click(/Check it first/); await sleep(60); out.push(`the check asks for the margin (answer ${w.__want}); typing it:`); d.getElementById("num").value = String(w.__want); click(/Check$/); await sleep(100);
+  out.push(`the facts come back (margin, the trader's price, seed, Cash): ${/Margin \d+%.*road trader pays \d+/.test(txt())}`); click(/Next/); await sleep(60);
+  click(/Take it/); await sleep(80); out.push(`taking it opens the haggle: ${/Their offer: \d+ a sack/.test(txt())}`);
+  const before = S.openOrders(s).length; click(/Accept \d+ a sack/); await sleep(150);
+  out.push(`the order is on the books and the shipping list: ${S.openOrders(s).length === before + 1}`);
+  out.push(`Maud's verdict names the result: ${/good take|Not a good take/.test(txt())} [${txt().replace(/\s+/g, " ").slice(0, 120)}]`);
+  const ev = w.Transcript.evidence("margin").filter(e => e.kind === "answer").length; out.push(`a good take after the check is margin evidence (${pick.kind}): ${pick.kind !== "good" || ev >= 1}`);
+  out.push(`it is marked, and won't be offered twice: ${w.Standing.state(s).seen[pick.sid] === "well" || w.Standing.state(s).seen[pick.sid] === "off"} / ${w.Standing.today(s).every(o => o.sid !== pick.sid)}`); G.closeDlg();
+  // passing a trap after checking it earns the pass
+  { give(300); let guard = 0; while (guard++ < 12 && !w.Standing.today(s).some(o => !w.Standing.judge(s, o).well)) { S.sleep(s); give(300); } const trap = w.Standing.today(s).find(o => !w.Standing.judge(s, o).well); s.offers.length = 0; G.hud(); G.noticeBoard(); await sleep(40); click(/Standing orders/); await sleep(40); const rest = w.Standing.today(s), j = rest.findIndex(o => o.sid === trap.sid); btns().filter(b => /sacks at/.test(b.textContent))[j].click(); await sleep(40);
+    click(/Check it first/); await sleep(40); d.getElementById("num").value = String(w.__want); click(/Check$/); await sleep(80); click(/Next/); await sleep(40); click(/Pass/); await sleep(80);
+    out.push(`a ${trap.kind} trap, checked and passed: marked passed, and Maud says why it was a trap: ${w.Standing.state(s).seen[trap.sid] === "passed"} [${txt().replace(/\s+/g, " ").slice(0, 130)}]`); G.closeDlg(); }
+  // the wager on the daily problem
+  give(300); const cash0 = s.bal.cash; s.practice = { streak: 0, best: 0, favour: 0, recent: [], done: {}, log: [] }; s.scenes = { maud_abacus: 9, ashby_bram: 11, crane_offduty: 13, tomas_contracts: 13, hobb_extension: 14, ezra_letter: 18, mira_rumour: 17, maud_confession: 19, ashby_guarantee: 21, crane_seal: 23, vane_offer: 24, maud_eve: 27 }; G.talk("maud"); await sleep(60); click(/Maud's problem/); await sleep(60);
+  out.push(`the problem opens with an optional stake: ${/Stake a few coin/.test(txt()) && btns().some(b => /No stake/.test(b.textContent)) && btns().some(b => /Stake 3/.test(b.textContent))}`);
+  click(/Stake 2/); await sleep(80); out.push(`the stake leaves the chest at once (Cash ${cash0} -> ${s.bal.cash}): ${s.bal.cash === cash0 - 2}`);
+  if (d.getElementById("num")) { d.getElementById("num").value = String(w.__want); click(/Check$/); await sleep(150); out.push(`right on the first answer: the stake comes back doubled (Cash ${s.bal.cash}): ${s.bal.cash === cash0 + 2}`); }
+  else { const p = w.Practice.pick(s, w.Transcript.state), c0 = s.bal.cash; click(new RegExp("^\\d" + (p.choices ? p.choices[p.answer] : "Same").slice(0, 8).replace(/[()]/g, "."))); await sleep(120); out.push(`a choice problem (${p.id}): the right choice wins the stake (Cash ${c0} -> ${s.bal.cash}): ${s.bal.cash === c0 + 4 || s.bal.cash === c0 + 2 + 2}`); }
+  out.push(`the books still balance: ${S.balanceSheet(s.bal).assets === S.balanceSheet(s.bal).liab + S.balanceSheet(s.bal).equity}`);
+  out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
+} catch (e) { out.push("THROWN " + e.message); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>

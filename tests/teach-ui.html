@@ -18,11 +18,11 @@ f.onload = async () => { try {
   // 2. click a HUD number
   d.getElementById("h-cash").click(); await sleep(40); out.push(`clicking Cash explains it: ${/Money in hand/.test(panel()) && /latest postings/.test(panel())}`); G.hidePanel();
   // 3. ledger tour
-  G.ledgerTour(); await sleep(40); btn(/Show me/).click(); await sleep(40);
+  G.ledgerTour(); await sleep(40); btn(/Next/).click(); await sleep(40); btn(/Show me/).click(); await sleep(40); // (the intro is two boxes)
   out.push(`tour asks for the debits: ${/first posting/.test(txt()) && /debit/.test(txt())}`);
   const j0 = s.journal[0], debits = Object.values(j0.lines).filter(v => v > 0).reduce((a, v) => a + v, 0);
   d.getElementById("num").value = debits; btn(/Check/).click(); await sleep(60);
-  out.push(`tour accepts the right total and moves on: ${/balance sheet/.test(txt())}`); G.closeDlg();
+  out.push(`tour accepts the right total and moves on: ${/Total assets/.test(txt())}`); G.closeDlg();
   // 4. notice board
   while (s.day < 2) S.sleep(s); G.interactTile(18, 7); await sleep(40);
   out.push(`board shows the market outlook and the tinker: ${/Village notices/.test(txt()) && /Day 3/.test(txt()) && /tinker/.test(txt())}`);

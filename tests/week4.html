@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Week 4</title></head><body><pre id="out">running</pre>
+<!-- Creative call 1: in week 4 Maud stops teaching and the daily problem comes from Ezra; letters list in the order found with the last one last.
+     Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=60000 --dump-dom tests/week4.html -->
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.style.cssText = "width:1180px;height:800px"; f.src = "../game.html?new=1&touch=0"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(600);
+  const w = f.contentWindow, d = w.document, G = w.G, s = G.s, errs = []; w.addEventListener("error", e => errs.push(e.message)); G.closeDlg(); document.querySelectorAll(".wkcard").forEach(e => e.remove());
+  const btns = () => [...d.querySelectorAll("#dlg .ch button")].filter(b => b.offsetParent), txt = () => d.getElementById("dlg").textContent, click = re => { const b = btns().find(x => re.test(x.textContent)); if (!b) throw new Error("no " + re + " in " + btns().map(x => x.textContent)); b.click(); };
+  w.Story.testScene("none"); const st = w.Story.state; st.ch = 9; st.stage = "run9"; st.weeks = [1, 2, 3, 4]; st.book = true; s.scenes = { maud_abacus: 9, ashby_bram: 11, crane_offduty: 13, tomas_contracts: 13, hobb_extension: 14, ezra_letter: 18, mira_rumour: 17, maud_confession: 19, ashby_guarantee: 21, crane_seal: 23, vane_offer: 24 };
+  // week 3: Maud offers the problem
+  s.day = 16; G.hud(); G.talk("maud"); await sleep(80); out.push(`week 3: Maud offers today's problem: ${btns().some(b => /Maud's problem/.test(b.textContent))}`); G.closeDlg();
+  // week 4: she does not teach; the desk says Ezra's problem; Ezra asks it
+  s.day = 23; s.practice = { streak: 0, best: 0, favour: 0, recent: [], done: {}, log: [] }; G.hud(); G.talk("maud"); await sleep(80);
+  out.push(`week 4: Maud only nods (no problem, no menu of lessons): ${!btns().some(b => /problem/i.test(b.textContent)) && /nods|danger|quiet|speaks only|rat|Barnaby|pig|Pell/.test(txt())} [${txt().slice(0, 90)}]`); G.closeDlg();
+  G.desk(); await sleep(80); out.push(`week 4: the desk lists Ezra's problem, not Maud's: ${btns().some(b => /Ezra's problem \(new\)/.test(b.textContent)) && !btns().some(b => /Maud's problem/.test(b.textContent))}`); G.closeDlg();
+  w.Story.testScene("none"); G.talk("ezra"); await sleep(80); out.push(`week 4: Ezra offers "A problem on your books": ${btns().some(b => /A problem on your books/.test(b.textContent))}`);
+  click(/A problem on your books/); await sleep(100); if (btns().some(b => /No stake/.test(b.textContent))) { click(/No stake/); await sleep(100); } // (T5's optional wager comes first)
+  out.push(`the question is asked by Ezra, with no Explain-how button: ${/Ezra/.test(d.getElementById("dlg").textContent) && !btns().some(b => /Explain how/.test(b.textContent))} (answer ${w.__want})`);
+  d.getElementById("num").value = String(w.__want); click(/Check/); await sleep(150);
+  out.push(`a right answer counts: ${s.practice.done[s.day] === 2} and earns Ezra's regard (trust ${s.trust.ezra})`); G.closeDlg();
+  // letters: in the order found, the Court's letter last
+  st.pages = [8, 3, 5, 9]; st.pageDays = { 3: 12, 5: 1, 9: 12, 8: 28 }; G.desk(); await sleep(60); click(/Edric's letters/); await sleep(100);
+  out.push(`letters panel order: ${[...d.querySelectorAll("#panelBody .journal b")].map(b => b.textContent).join(" > ")}`);
+  out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
+} catch (e) { out.push("THROWN " + e.message); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>

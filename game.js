@@ -211,7 +211,7 @@
       if (a[0] === "walk") { walked = true; window.__walked = true; extra = `<br><span class="hintline"><b>Here's my working:</b> ${work || hints.join(" ") + ` That gives ${answer}.`}<br>Now you enter it.</span>`; continue; }
       if (a[0] === "doc") { await openDoc(a[1].open); continue; }
       if (r.v != null && !isNaN(r.v) && Math.abs(r.v - answer) <= (tol || 0)) { window.__want = undefined; askSkip = null; toast(walked ? "Right. We'll come back to this one." : "Right."); return r.v; }
-      tries++; if (!walked) extra = `<br><i class="hintline">${isNaN(r.v) || r.v == null ? "Type a number." : `Not ${r.v}. `}${hints[Math.min(tries - 1, hints.length - 1)]}</i>`;
+      tries++; window.__tries = tries; if (!walked) extra = `<br><i class="hintline">${isNaN(r.v) || r.v == null ? "Type a number." : `Not ${r.v}. `}${hints[Math.min(tries - 1, hints.length - 1)]}</i>`;
     }
   }
   // ---------- feedback: no email address in the game; copy a text block the player pastes into their own email ----------
@@ -274,7 +274,7 @@
   }
   // Stall detector: the story is waiting but nothing is on screen for 4 s -> point the player to the menu.
   setInterval(() => {
-    const idle = storyOn && Story.busy && !dlgOpen() && !panelOpen() && !$("pause");
+    const idle = storyOn && Story.busy && !dlgOpen() && !panelOpen() && !$("pause") && !document.querySelector(".s6ov, .wkcard, #court"); // the ending card, the week card and the Court are screens too
     stall.t = idle ? (stall.t || 0) + 1 : 0; if (stall.t === 4) toast("Something seems stuck. Open the menu (☰, top right) to restart the day.");
   }, 1000);
   const stall = {};
@@ -305,7 +305,7 @@
       if (pick.startsWith('"I always')) { used.rec = 1; walk += 1; line = "True enough. You've never let me down."; continue; }
       const p = r.v; round++;
       if (p == null || isNaN(p) || p <= 0) { line = "Say a number, dear."; continue; }
-      if (p < fl && storyOn) { const k = await sayP("maud", `${p} is under your cost floor: each sack cost you ${fl}. Sure? Your margin would be ${Math.round((p - fl) / p * 100)}%.`, ["Think again", "Yes, sell below cost"]); if (k === 0) continue; }
+      if (p < fl && storyOn) { const k = await sayP("maud", `${p} is under your cost floor of ${fl}, so your margin would be ${Math.round((p - fl) / p * 100)}%. Sure?`, ["Think again", "Yes, sell below cost"]); if (k === 0) continue; }
       if (p <= theirs) return close(theirs);
       if (p <= walk) { line = "Done."; return close(p); }
       if (p > walk + 2) { s.trust[o.who] = Math.max(0, s.trust[o.who] - 1); line = `${p}? That's an insult. ${theirs} is my offer.`; continue; }
@@ -334,7 +334,7 @@
   // ---------- visitors: Pell the pig farmer (grain he can't pay for) and Barnaby the pedlar (rat poison) ----------
   function depositLesson(o) { // Cash rose, Revenue didn't: the deposit is a promise of grain, so it's a liability (WS6: named unearned revenue, C1.01/C1.03)
     if (storyOn) Story.noteDeposit(o);
-    say("maud", `Look at Cash: it just rose by ${o.paid}. But Revenue didn't move. You haven't earned that money yet: you owe ${S.NAMES[o.who]} ${o.sacks} sacks, so the deposit sits on the balance sheet as a liability, <b>Customer deposits</b>. Accountants call it <b>unearned revenue</b>: money received for work not yet done. Spend it on seed if you must, but if the grain doesn't arrive by day ${o.due + S.R.lateGrace}, you refund it and pay a forfeit.<br>The Cash is real. The profit isn't, until you deliver.`, [["Open the Ledger", ledger], ["Close", null]]);
+    say("maud", `Look at Cash: it rose by ${o.paid}, but Revenue didn't move. You owe ${S.NAMES[o.who]} ${o.sacks} sacks, so the deposit is a liability, <b>Customer deposits</b>, also called <b>unearned revenue</b>.`, [["Next", () => say("maud", `If the grain isn't there by day ${o.due + S.R.lateGrace}, you refund it and pay a forfeit. The Cash is real; the profit isn't until you deliver.`, [["Open the Ledger", ledger], ["Close", null]])]]);
   }
   async function pellTalk() {
     if (s.pell) return say("pell", s.pell === "deal" ? "Twelve sacks, and my pigs stay home. You're a good neighbour." : "Nothing more to say to you.");
@@ -343,7 +343,7 @@
     if (pick === 0) { const o = S.addOffer(s, "pell", S.R.pellSacks, S.R.unitCost, 14, 4, 2), deal = await haggle(o, { open: S.R.unitCost, walk: S.R.unitCost + 1, line: "Four a sack. It's all I have, neighbour." });
       if (!deal) S.decline(s, o.id); else await sayP("pell", "Twelve sacks by day " + (s.day + 4) + ". I'll keep the pigs in.", ["Close"]); }
     else if (pick === 1) { const o = S.addOffer(s, "pell", S.R.pellSacks, 3, 21, 4, 2); o.share = true; const r = act(() => S.accept(s, o.id));
-      if (r.ok) say("maud", `At 3 a sack you're selling under your cost of ${S.R.unitCost}, so this sale's Gross profit is −${S.R.pellSacks}. The quarter of the pig money, about ${S.R.pellShare}, is a promise. It isn't Cash, a bill or Revenue until Pell pays it at Midwinter, so the Ledger lists it as a note and nowhere else.<br>Is it worth it? Maybe. But look at what your books say today.`, [["Open the Ledger", ledger], ["Close", null]]); }
+      if (r.ok) say("maud", `At 3 a sack you're selling under your cost of ${S.R.unitCost}, so this sale's Gross profit is −${S.R.pellSacks}. The quarter of the pig money, about ${S.R.pellShare}, is a promise.`, [["Next", () => say("maud", "It isn't Cash, a bill or Revenue until Pell pays at Midwinter, so the Ledger lists it as a note and nowhere else; is it worth it? Look at what your books say today.", [["Open the Ledger", ledger], ["Close", null]])]]); }
     else if (pick === 2) { act(() => S.refusePell(s)); say("pell", "I'll remember this. So will my pigs."); }
   }
   async function pedlarTalk() {
@@ -368,8 +368,49 @@
     const arrow = p => p > now ? " ▲" : p < now ? " ▼" : "";
     const tip = !top ? "" : top.price > now ? `Prices are heading up: ${top.price} by day ${top.day}. Grain you don't have to ship before then could fetch more.` : top.price < now ? "Prices are slipping. Better to ship what you've promised and not hold surplus." : "Prices hold steady.";
     const text = `<b>Village notices</b><br>Going price today: <b>${now}</b> a sack.<br>${o.length ? o.map(x => `Day ${x.day}: ${x.price}${arrow(x.price)}`).join(" · ") : "The season is nearly over."}<br><i>${tip}</i>${n ? `<br><br><b>${n.title}</b><br>${n.text}` : ""}`;
-    const opts = n ? n.options.map((label, i) => [label, () => { const r = act(() => S.answerNotice(s, i)); say(r.ok ? "maud" : null, r.ok ? noticeLesson(n.id, r.msg) : r.msg); }]) : [];
+    const opts = n ? n.options.map((label, i) => [label, () => { const f0 = n.id === "frost" ? frostRead() : null, r = act(() => S.answerNotice(s, i)); if (r.ok && f0) { if (f0.ruin === (r.msg === "covered")) TR.master("ev", s.day); say("maud", frostLesson(f0, r.msg)); } else say(r.ok ? "maud" : null, r.ok ? noticeLesson(n.id, r.msg) : r.msg); }]) : [];
+    const nso = soOk() ? Standing.today(s).length : 0;
+    if (nso) opts.push([`Standing orders (${nso})`, standingBoard]);
     say(null, text, opts.concat([["Close", null]]));
+  }
+  // ---------- standing orders (standing.js): repeatable contracts on the notice board. Check one (margin, the best alternative sale, can Cash carry it, when the money comes), then take it or pass. ----------
+  const soOk = () => !!window.Standing && (!storyOn || Story.state.ch >= 5) && s.day >= Standing.MIN_DAY;
+  const shortWho = who => { const n = (S.NAMES[who] || who).split(",")[0], w = n.split(" "); return / the /.test(n) || w.length === 1 ? w[0] : w[w.length - 1]; }; // "Hobb the Miller" -> Hobb, "Widow Ashby" -> Ashby
+  function standingBoard() {
+    const list = soOk() ? Standing.today(s) : [];
+    if (!list.length) return say(null, "No standing orders on the board today. New ones go up each morning.", [["Back", noticeBoard], ["Close", null]]);
+    say(null, "<b>Standing orders</b><br>Regular buyers post a price. Check one before you take it: not every posted price is a good one.",
+      list.map(o => [`${shortWho(o.who)}: ${o.sacks} sacks at ${o.price}, ${o.terms ? `paid ${o.terms} days after` : "Cash"}, by day ${o.due}`, () => standingOrder(o)]).concat([["Back", noticeBoard], ["Close", null]]));
+  }
+  async function standingOrder(o) {
+    const f = Standing.facts(s, o), docs = [{ label: "Open the Ledger", open: ledger }], desc = `${o.sacks} sacks at ${o.price}${o.terms ? `, paid ${o.terms} days after delivery` : ", Cash on delivery"}, by day ${o.due}.`;
+    let k = await sayP(o.who, `A standing order: ${desc}`, ["Check it first", "Take it as posted", "Pass"]), checked = false;
+    if (k === 2) { Standing.mark(s, o.sid, "passed"); save(); return; }
+    if (k === 0) {
+      window.__walked = false;
+      await ask("maud", `Your cost is ${f.cost} a sack and they pay ${o.price}. What's your margin on this order, in %?`, f.margin, ["Margin is profit over the price you sell at.", "(Price − cost) ÷ price, as a percentage."], null, 1, docs, `(${o.price} − ${f.cost}) ÷ ${o.price} = ${f.margin}%.`, "Take the cost off the price, then divide what's left by the price. Try 5 − 4 = 1, and 1 ÷ 5 = 20%.");
+      checked = !window.__walked;
+      await sayP("maud", `Margin ${f.margin}%, and the road trader pays ${f.floor} for the same sack. The seed to buy is ${f.seed}, which leaves Cash at ${f.cashAfter}${o.terms ? `, and the money comes on day ${f.arrive}` : ""}.`, ["Next"]);
+      k = await sayP(o.who, `So: ${desc}`, ["Take it", "Pass"]); k = k === 0 ? 1 : 2;
+      if (k === 2) { Standing.mark(s, o.sid, "passed"); const j = Standing.judge(s, o, f); if (checked && !j.well) { for (const id of (j.why.indexOf("thin") >= 0 ? ["opportunity"] : []).concat(j.why.some(w => w !== "thin") ? ["wc"] : [])) TR.master(id, s.day); toast("Good pass: you checked first."); FX.sfx("good"); } save(); return say("maud", checked && !j.well ? j.line : "Fair. The board posts new ones every morning."); }
+    }
+    const off = S.addOffer(s, o.who, o.sacks, o.price, o.terms, o.dueIn, 1);
+    await haggle(off, { open: o.price, walk: o.price + 1, line: "A regular order, as posted." });
+    const ord = S.openOrders(s).find(x => x.id === off.id);
+    if (!ord) { S.decline(s, off.id); Standing.mark(s, o.sid, "passed"); save(); return; }
+    const j = Standing.judge(s, Object.assign({}, o, { price: ord.price }), Standing.facts(s, Object.assign({}, o, { price: ord.price })));
+    Standing.mark(s, o.sid, j.well ? "well" : "off");
+    if (checked && j.well) { ["margin", "opportunity"].forEach(id => TR.master(id, s.day)); FX.sfx("good"); toast("Taken well: you checked it first."); }
+    else if (!j.well) toast("Taken, but not well. Maud has a word.");
+    hud(); save(); drainUses(); say("maud", j.line);
+  }
+  // The frost almanac (expected value vs ruin): the numbers read BEFORE the choice, the lesson revealed after it. Ruin = losing the crops would worsen the Crown verdict.
+  const verdictRank = (f, net) => { const gap = net - f.crown; return gap >= 0 ? 3 : gap + f.hoped >= 0 ? 2 : gap >= -S.R.bridgeMax ? 1 : 0; };
+  function frostRead() { const f = S.frostFacts(s), cf = S.crownFund(s); return Object.assign({}, f, { net: cf.net, crown: cf.crown, ruin: verdictRank(cf, cf.net - f.atRisk) < verdictRank(cf, cf.net) }); }
+  function frostLesson(f, msg) {
+    const avg = `${f.atRisk} at 1 in 3 is ${f.ev} on average, against the straw's ${f.cover}`;
+    return msg === "covered" ? `Straw was ${f.cover} for certain; risking it was ${f.ev} on average. ${f.ruin ? "But losing the crops would have cost you your Crown verdict, so certainty was worth the difference." : "On average that was dearer, but you bought certainty."}`
+      : `${avg}, so on average the gamble is cheaper. ${f.ruin ? `But losing the crops would leave the Crown fund at ${f.net - f.atRisk} against ${f.crown}, and an average doesn't save you on the bad night.` : "A loss would hurt, not sink you, so taking the cheaper average is defensible."}`;
   }
   function noticeLesson(id, msg) { // revealed after the choice, never before: the lesson lands because the player committed first
     return ({ tinker: { blind: "Two of the six were mouldy. You paid 60 for four good packets: 15 each, dearer than Tomas. A bargain you can't inspect isn't a bargain. The write-off is in the Ledger as a loss, and the 12 you saved shows up against Cost of goods sold.", inspected: "Smart: you paid 5 to learn two were mouldy, then bought only the four good ones for 40. The fee is an operating expense; the inspection made the cheap seed cheaper than Tomas's." , pass: "Fine. Tomas's seed costs more but you can trust it." },
@@ -379,10 +420,12 @@
   // ---------- the Ledger tour: how to read it, in the player's own books ----------
   async function ledgerTour() {
     const j0 = s.journal[0], debits = Object.values(j0.lines).filter(v => v > 0).reduce((a, v) => a + v, 0), b = S.balanceSheet(s.bal), docs = [{ label: "Open the Ledger", open: ledger }];
-    await sayP("maud", "The Ledger is a list of every posting, newest first. Each posting touches at least two accounts. <b>Debits</b> and <b>credits</b> are the two columns, and in every posting they add up to the same number. That's why Assets always equal Liabilities plus Owner's equity.", ["Show me"]);
-    await ask("maud", `Your farm's very first posting was: <b>${dr(j0)}</b>.<br>Add up just the <b>Dr</b> (debit) amounts. What do they total?`, debits, ["Debits are the lines that start with Dr. Add only those.", "Everything the farm had at the start went on the debit side. Cash and Inventory are two of them."], null, 0, docs, `Dr amounts: ${Object.entries(j0.lines).filter(([, v]) => v > 0).map(([k, v]) => `${S.ACCTS[k][0]} ${v}`).join(" + ")} = ${debits}. The Cr side must match: that's the rule.`, "Add the Dr lines.");
-    await ask("maud", `Now today's balance sheet. Your <b>Total assets</b> are ${b.assets}. If the books balance, what must <b>Liabilities + Owner's equity</b> add up to?`, b.assets, ["The balance sheet always balances: both sides are the same number.", "Assets = Liabilities + Owner's equity."], null, 0, docs, `Assets ${b.assets} = Liabilities ${b.liab} + Owner's equity ${b.equity}. Every posting keeps this true.`, "The two sides always match.");
-    await sayP("maud", "Three habits that make the Ledger useful:<br>1. Before a big choice, read what it will post. The game shows you the entry first.<br>2. After something odd happens (a loss, a deposit), find its line in the journal.<br>3. Click any number at the top of the screen and I'll tell you what it is and where it came from.", ["Got it"]);
+    await sayP("maud", "The Ledger is a list of every posting, newest first, and each posting touches at least two accounts. <b>Debits</b> and <b>credits</b> are its two columns.", ["Next"]);
+    await sayP("maud", "In every posting they add up to the same number, which is why Assets always equal Liabilities plus Owner's equity.", ["Show me"]);
+    await ask("maud", `Your farm's very first posting was <b>${dr(j0)}</b>: what do the <b>Dr</b> (debit) amounts add up to?`, debits, ["Debits are the lines that start with Dr. Add only those.", "Everything the farm had at the start went on the debit side. Cash and Inventory are two of them."], null, 0, docs, `Dr amounts: ${Object.entries(j0.lines).filter(([, v]) => v > 0).map(([k, v]) => `${S.ACCTS[k][0]} ${v}`).join(" + ")} = ${debits}. The Cr side must match: that's the rule.`, "Add the Dr lines.");
+    await ask("maud", `Today's <b>Total assets</b> are ${b.assets}: if the books balance, what must <b>Liabilities + Owner's equity</b> add up to?`, b.assets, ["The balance sheet always balances: both sides are the same number.", "Assets = Liabilities + Owner's equity."], null, 0, docs, `Assets ${b.assets} = Liabilities ${b.liab} + Owner's equity ${b.equity}. Every posting keeps this true.`, "The two sides always match.");
+    await sayP("maud", "Three habits make the Ledger useful. First, before a big choice, read what it will post: the game shows you the entry.", ["Next"]);
+    await sayP("maud", "Second, after something odd (a loss, a deposit), find its line in the journal. Third, click any number at the top of the screen and I'll tell you where it came from.", ["Got it"]);
     s.tour = true;
   }
   // ---------- click a number: what it is, how it's made, and the latest entries behind it ----------
@@ -438,6 +481,7 @@
     const opts = [["Borrow 50", go(c => S.borrow(c, 50)), room < 50], ["Borrow 100", go(c => S.borrow(c, 100)), room < 100], ["Repay 50", go(c => S.repay(c, 50)), !owed || s.bal.cash < Math.min(50, owed) + S.loanFacts(s, 50).fee]];
     if (owed) opts.push(["Should I repay early?", () => repayAdvice(owed)]);
     if (inv && (!storyOn || Story.state.ch >= 8)) opts.push([`Sell ${S.NAMES[inv.who]}'s invoice (${inv.amount}) for ${Math.round(inv.amount * .85)} today`, go(c => S.factor(c, inv.id))]);
+    if (wk4() && Practice.available(s, TR.state)) opts.push(["A problem on your books", problem]);
     opts.push(["Ask Ezra about…", () => chat("ezra")]); opts.push(["Leave", null]);
     const wk = Math.round(owed * t.rateBp / 10000);
     say("ezra", `Your credit: ${hearts(s.trust.ezra)}. I lend up to ${t.loanLimit} at ${t.rateBp / 100}% a week. You owe me ${owed}${owed ? `: that's ${wk} of interest every pay-day until it's repaid. Repay before day ${S.R.prepayBefore} and I charge one week's interest on what you repay.` : "."}`, opts);
@@ -455,18 +499,28 @@
       `<i>${late ? "Bought this late, it's a good machine in a bad month: profit says yes, Cash says wait. " : ""}A machine is worth it when the savings over its life beat its price and your Cash can wait for them. Profit and Cash can disagree. That's the Ledger's lesson.</i>`,
       [["Back", tomas], ["Open the Ledger", ledger]]);
   }
-  function maud() { const c = S.coach(s), has = !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
+  // Creative call 1 (docs/TASKS-season1.md): in week 4 Maud stops teaching (no problem, shows, hints or Explain-how from her; her story scenes still play) and the daily problem comes from Ezra.
+  const wk4 = () => storyOn && Story.weekOf && Story.weekOf(s.day) === 4, teacher = () => wk4() ? "ezra" : "maud";
+  function maud() { const c = S.coach(s), has = !wk4() && !!Practice.available(s, TR.state); const opts = [[has ? "Maud's problem for today" : "Ask about something else", has ? problem : () => chat("maud")]]; if (has) opts.push(["Ask about something else", () => chat("maud")]); opts.push(["Close", null]);
     say("maud", c ? c.text : Cast.greet("maud", s), opts); }
   // ---------- practice: one small problem a day on your own numbers (practice.js). A right answer on your own is evidence in the transcript; a walk-through is not. ----------
+  // An optional wager on the day's problem: right on the FIRST answer and the stake comes back doubled; anything else and Maud keeps it. 0 is always fine. Real Cash, posted so the books tie (Spring.wager).
+  async function wagerStake(topic) {
+    const mx = Math.min(3, s.bal.cash); if (mx < 1) return 0; const opts = []; for (let k = 0; k <= mx; k++) opts.push(k);
+    const r = await dlg({ who: "maud", text: `Today's problem is about <b>${topic}</b>: stake a few coin on getting it right first time? I pay the stake again if you do, and no stake is fine.`, choices: opts.map(k => k ? `Stake ${k}` : "No stake") });
+    const stake = opts[r.i] || 0; if (stake) act(() => S.wager(s, stake, "Practice wager")); return stake;
+  }
   async function problem() {
-    if (s.practice && s.practice.done[s.day]) return say("maud", "That's today's. Come back tomorrow; the numbers will have moved.");
+    const T = teacher(); if (s.practice && s.practice.done[s.day]) return say(T, T === "ezra" ? "That is today's. Come back tomorrow; patience has a price, and the numbers will have moved." : "That's today's. Come back tomorrow; the numbers will have moved.");
     const cmp = s.day >= 3 && s.offers.length >= 2 && (s.day % 3 === 0) ? Practice.compare(s) : null, p = cmp || Practice.available(s, TR.state);
-    if (!p) return say("maud", "Nothing worth asking today. Your books are quiet.");
-    window.__walked = false; let right = true;
-    if (cmp) { const r = (await dlg({ who: "maud", text: p.text, choices: ["A", "B", "The same"] })).i; right = r === p.answer; if (!right) { await sayP("maud", `Not quite. ${p.work}`, ["I see"]); } }
-    else { await ask("maud", p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; }
+    if (!p) return say(T, "Nothing worth asking today. Your books are quiet.");
+    const stake = await wagerStake(TR.name(p.concept)); // optional: a few coins on your first answer, never a gate
+    window.__walked = false; window.__tries = 0; let right = true, tries = 0;
+    if (cmp || p.choices) { const r = (await dlg({ who: T, text: p.text, choices: cmp ? ["A", "B", "The same"] : p.choices })).i; right = r === p.answer; tries = right ? 0 : 1; if (!right) { await sayP(T, `Not quite. ${p.work}`, ["I see"]); } }
+    else { await ask(T, p.text, p.answer, p.hints, null, p.tol, (p.docs || []).map(d => d === "ledger" ? { label: "Open the Ledger", open: ledger } : { label: "Open the cash forecast", open: () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }) }), p.work); right = !window.__walked; tries = window.__tries; }
+    if (stake) { if (right && tries === 0) { act(() => S.wagerWin(s, stake, "Practice wager")); FX.sfx("coin"); toast(`First answer right: you win ${stake}.`); } else toast(`Maud keeps your ${stake}.`); }
     const q = Practice.record(s, p, right, !right);
-    if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust.maud != null && q.favour % 2 === 0 && s.trust.maud < 10) s.trust.maud++; toast(q.streak > 1 ? `${q.streak} days running ★` : "Maud nods."); }
+    if (right) { TR.master(p.concept, s.day); FX.sfx("good"); if (s.trust[T] != null && q.favour % 2 === 0 && s.trust[T] < 10) s.trust[T]++; toast(q.streak > 1 ? `${q.streak} days running ★` : T === "ezra" ? "Ezra inclines his head." : "Maud nods."); }
     else toast("We'll come back to this one.");
     hud(); save(); drainUses();
   }
@@ -483,7 +537,7 @@
     s.scenes[sc.id] = s.day; s.flags = s.flags || {};
     const c = { s, S, lines: async (who, arr) => { for (const t of arr) await sayP(who, t, ["Next"]); }, ask: (who, text, labels) => sayP(who, text, labels),
       maud: text => sayP("maud", text, ["Mm."]), flag: (k, v) => { s.flags[k] = v; }, clue: () => { s.clues = (s.clues || 0) + 1; // WS6: a scene that reveals a clue also pins a card on the case board (scenes.js: sc.card = [term, number-or-quote])
-        if (storyOn && sc.card) Story.pin("scene_" + sc.id, sc.card[0], sc.card[1], `Day ${s.day} · ${Cast.name(sc.who).split(",")[0]}`, "scene"); else toast(`A clue: ${s.clues} of ${Scenes.CLUES}`); },
+        if (storyOn && sc.card) Story.pin("scene_" + sc.id, sc.card[0], sc.card[1], `Day ${s.day} · ${Cast.short(sc.who)}`, "scene"); else toast(`A clue: ${s.clues} of ${Scenes.CLUES}`); },
       trust: (who, d) => { if (s.trust[who] != null) s.trust[who] = Math.max(0, Math.min(10, s.trust[who] + d)); if (d > 0) toast(`${Cast.name(who).split(",")[0]} trusts you more ♥`); },
       letter: async i => { if (storyOn) await Story.letter(i); else await page(Story.PAGES[i], Story.LETTERS[i]); } };
     try { await sc.run(c); } finally { hud(); save(); }
@@ -500,12 +554,12 @@
     const c = S.coach(s);
     const ex = storyOn ? Story.deskItems() : []; // WS6: Crane's offer and the case board join the Desk menu (before "Back to the road")
     dlg({ who: null, text: `Your desk: Edric's ledger, the forecast board, Maud's notebook.${storyOn ? Story.deskNote() : ""}${c && c.danger ? `<br><b>Maud's note:</b> ${c.text}` : ""}`,
-      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", Practice.available(s, TR.state) ? "Maud's problem (new)" : "Maud's problem (done today)", "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, ...ex.map(x => x.label), "Back to the road"] })
+      choices: [`Sleep (end day ${s.day})`, "Ledger", "Ledger tour: how to read it", `${wk4() ? "Ezra's problem" : "Maud's problem"} (${Practice.available(s, TR.state) ? "new" : "done today"})`, "Cash forecast", "The week's plan", "Notebook (N)", "Transcript (T)", `Edric's letters${storyOn && Story.state.pages.length ? ` (${Story.state.pages.length})` : ""}`, ...ex.map(x => x.label), "Back to the road"] })
       .then(r => { const f = [sleepNow, ledger, ledgerTour, problem, () => board({ title: "Cash forecast, next two weeks", show: 14, fill: [] }), plan, notebook, transcript, letters, ...ex.map(x => x.fn), () => { atDesk = false; hud(); }][r.i]; f && f(); });
   }
-  function letters() { // every letter of Edric's you've found, newest first, to read again
-    const st = storyOn ? Story.state : { pages: [] }, ids = st.pages.slice().sort((a, b) => b - a);
-    showPanel("letters", `<h1>Edric's letters <span class="hint">${ids.length} of ${Story.LETTERS.length} found</span></h1>` + (ids.map(i => `<div class="journal small"><b>${Story.LETTERS[i]}</b><p>${Story.PAGES[i]}</p><p class="sig">— E.</p></div>`).join("") || "<p class='hint'>None yet. Edric left them where the lessons are.</p>"));
+  function letters() { // every letter of Edric's you've found, in the order you found them (the last one always last), to read again
+    const st = storyOn ? Story.state : { pages: [], pageDays: {} }, ids = storyOn ? Story.letterOrder() : [];
+    showPanel("letters", `<h1>Edric's letters <span class="hint">${ids.length} of ${Story.LETTERS.length} found</span></h1>` + (ids.map(i => `<div class="journal small"><b>${Story.LETTERS[i]}</b>${st.pageDays && st.pageDays[i] ? ` <span class="hint">found day ${st.pageDays[i]}</span>` : ""}<p>${Story.PAGES[i]}</p><p class="sig">— E.</p></div>`).join("") || "<p class='hint'>None yet. Edric left them where the lessons are.</p>"));
   }
   function plan() {
     const o = S.openOrders(s), need = S.committed(s) - s.sacks - S.sacksComing(s);
@@ -556,7 +610,7 @@
     const f = S.forecast(s, 1)[0];
     if (f && (f.cin || f.cout) && !fast && (!storyOn || Story.state.ch >= 9)) { atDesk = false;
       const bits = [f.cin ? `${f.cin} comes in (invoices due)` : "", f.wages ? `${f.wages} of wages and interest goes out` : "", f.bills ? `${f.bills} of Tomas's bills goes out` : "", f.fines ? `${f.fines} of forfeits goes out` : ""].filter(Boolean).join("; ");
-      const r = await dlg({ who: "maud", text: `Before you sleep: tonight ${bits}. Cash is ${s.bal.cash} now. <b>What will Cash be when you wake?</b>`, input: "Cash tomorrow", choices: ["Check my guess", "Just sleep"] });
+      const r = await dlg({ who: "maud", text: `Before you sleep: tonight ${bits}, and Cash is ${s.bal.cash} now. <b>What will Cash be when you wake?</b>`, input: "Cash tomorrow", choices: ["Check my guess", "Just sleep"] });
       guess = r.i === 0 && r.v != null && !isNaN(r.v) ? { v: r.v, f, before: s.bal.cash } : null; }
     doSleep();
   }
@@ -580,7 +634,7 @@
   function lossLesson() { // a loss shows up in the Ledger as an expense with no Cash leaving: walk the player to the exact lines
     const j = s.journal.find(x => x.type === "loss" && x.day === s.day - 1); if (!j || (storyOn && Story.busy)) return;
     const n = Object.values(j.lines)[0] ? j.lines.losses : 0; FX.thud(); FX.shake($("wrap"));
-    say("maud", `Open the Ledger and find the journal line "${j.memo}".<br>Debit Crop & stock losses ${n}, credit Inventory ${n}. Cash didn't move, but Net income fell by ${n} and so did Inventory: value you paid for is gone. That's why losses hit profit.`,
+    say("maud", `Find the journal line "${j.memo}": Debit Crop & stock losses ${n}, credit Inventory ${n}.<br>Cash didn't move, but Net income and Inventory both fell by ${n}, because value you paid for is gone.`,
       [["Open the Ledger", ledger], ["Later", null]]);
   }
   function night(title, notes, then, info) { // info: the day-end card (Cash change, who owes you, losses); tap to dismiss early
@@ -731,7 +785,7 @@
     else ez.innerHTML = mw + `<p>Before summer, Ezra reads your books. Explain them well and he lends more, cheaper.</p><button class="btn gold" id="goEzra">Take the books to Ezra</button>`;
     ez.insertAdjacentHTML("beforeend", endBtn());
     wire(); save();
-    // WS6 finale slot: if the Ledger Duel (court.js, another builder) is loaded it runs now; otherwise the close + verdict above stand, with "The Audit (coming)"
+    // WS6 finale slot: if the Ledger Duel (court.js, another builder) is loaded it runs now; otherwise the close + verdict above stand
     if (storyOn && window.Court && Court.run && s.outcome !== "insolvent") await Court.run({ G: window.G, s, Story, Endings, st: closing.st, verdict: S.crownFund(s).verdict, ending: Endings.ending(s) });
   }
   function reveal(k, text) { return new Promise(res => { (k === "bs" ? ["bs0", "bs1"] : [k]).forEach(x => $("sec-" + x) && $("sec-" + x).classList.remove("veil"));
@@ -741,8 +795,8 @@
     rows.forEach(r => { if (!r.dataset.line) return; r.classList.add("pick"); r.onclick = () => {
       if (r.dataset.line === target) { rows.forEach(x => { x.onclick = null; x.classList.remove("pick"); }); window.__pick = undefined; res(tries); } // resolves with the number of wrong taps first
       else { tries++; $("mline").innerHTML = `<b>Maud:</b> ${text}<br><i class="hintline">Not that one. ${hints[Math.min(tries - 1, hints.length - 1)]}</i>`; } }; }); }); }
-  // WS6: the ending (Sold out / Seized / Bridged / Free) after the books close; "The Audit (coming)" stands in for the WS8 finale
-  const endBtn = () => storyOn ? `${window.Court ? "" : `<p class="hint">The Audit (coming): Corvin Vane before the magistrate.</p>`}<p><button class="btn alt" id="goEnd">How it ends</button></p>` : "";
+  // WS6: the ending (Sold out / Seized / Bridged / Free) after the books close
+  const endBtn = () => storyOn ? `<p><button class="btn alt" id="goEnd">How it ends</button></p>` : "";
   function wire() { const a = $("again"), g = $("goEzra"), e = $("goEnd"); if (a) a.onclick = restart; if (g) g.onclick = review; if (e) e.onclick = () => Story.showEnding(Endings.ending(s)); }
   function review() {
     const qs = B.review(closing.st), before = S.terms(s); let i = 0, right = 0; const ez = $("ez");
@@ -766,7 +820,7 @@
   // ---------- drawing ----------
   const cam = { x: 0, y: 0 };
   function blit(img, x, y) { ctx.drawImage(img, Math.round(x - cam.x), Math.round(y - cam.y)); }
-  function drawBoard() { const x = BOARD.x * T - cam.x, y = BOARD.y * T - cam.y; ctx.fillStyle = "#6b4526"; ctx.fillRect(x + 2, y + 2, 2, 14); ctx.fillRect(x + 12, y + 2, 2, 14); ctx.fillStyle = "#cf9f62"; ctx.fillRect(x, y - 6, 16, 11); ctx.fillStyle = "#f4ead0"; ctx.fillRect(x + 2, y - 4, 5, 6); ctx.fillRect(x + 9, y - 3, 5, 5); ctx.fillStyle = S.notice(s) ? "#c43a1a" : "#946b3c"; ctx.fillRect(x + 4, y - 5, 1, 1); ctx.fillRect(x + 11, y - 4, 1, 1); }
+  function drawBoard() { const x = BOARD.x * T - cam.x, y = BOARD.y * T - cam.y; ctx.fillStyle = "#6b4526"; ctx.fillRect(x + 2, y + 2, 2, 14); ctx.fillRect(x + 12, y + 2, 2, 14); ctx.fillStyle = "#cf9f62"; ctx.fillRect(x, y - 6, 16, 11); ctx.fillStyle = "#f4ead0"; ctx.fillRect(x + 2, y - 4, 5, 6); ctx.fillRect(x + 9, y - 3, 5, 5); const news = S.notice(s) || (soOk() && Standing.today(s).length); ctx.fillStyle = news ? "#c43a1a" : "#946b3c"; ctx.fillRect(x + 4, y - 5, 1, 1); ctx.fillRect(x + 11, y - 4, 1, 1); if (news) { ctx.fillRect(x + 7, y - 15, 2, 5); ctx.fillRect(x + 7, y - 9, 2, 2); } }
   function drawWell(W) { const x = W.x * T - cam.x, y = W.y * T - cam.y; ctx.fillStyle = "#8d949b"; ctx.fillRect(x + 1, y + 4, 14, 11); ctx.fillStyle = "#6f757b"; ctx.fillRect(x + 1, y + 12, 14, 3);
     ctx.fillStyle = "#2d5f9a"; ctx.fillRect(x + 3, y + 5, 10, 5); ctx.fillStyle = "#6b4526"; ctx.fillRect(x + 1, y - 6, 2, 11); ctx.fillRect(x + 13, y - 6, 2, 11); ctx.fillStyle = "#9b2335"; ctx.fillRect(x - 1, y - 9, 18, 4); }
   function drawStall(f) { const x = (f.x - 1) * T - cam.x, y = (f.y - 1) * T - cam.y;

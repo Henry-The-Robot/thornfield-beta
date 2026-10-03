@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Day loop</title></head><body><pre id="out">running</pre>
+<!-- The day-loop report: for each day of Spring, the choices on offer and the surprise or set piece, from the live game objects (engine tables, scenes, Market Day, standing orders).
+     Pass = every day 2-28 has at least one of each over 40 seeds. Run: chrome --headless --allow-file-access-from-files --virtual-time-budget=30000 --dump-dom tests/day-loop.html -->
+<script src="day-loop.js"></script>
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
+(async () => { try {
+  const f = document.createElement("iframe"); f.src = "../game.html?sandbox&new=1"; f.style.cssText = "width:900px;height:600px"; document.body.appendChild(f); await new Promise(r => f.onload = r); await sleep(300);
+  const w = f.contentWindow, extra = { Scenes: w.Scenes, Market: w.Market, Standing: w.Standing }, gaps = { c: new Set(), z: new Set() };
+  for (let seed = 1; seed <= 40; seed++) DayLoop.dayLoop(w.Spring, extra, seed).forEach(r => { if (r.day >= 2) { if (!r.choices.length) gaps.c.add(r.day); if (!r.surprises.length) gaps.z.add(r.day); } });
+  out.push(`gaps over 40 seeds: choices on days [${[...gaps.c]}], surprises on days [${[...gaps.z]}]: ${gaps.c.size + gaps.z.size === 0 ? "none: every day 2-28 has a choice and a surprise or set piece" : "FAIL"}`);
+  DayLoop.dayLoop(w.Spring, extra, 3).forEach(r => out.push(`day ${String(r.day).padStart(2)}: ${r.choices.length} choice(s) [${r.choices.slice(0, 3).join("; ")}${r.choices.length > 3 ? "; ..." : ""}] · surprise: ${r.surprises.join("; ") || "-"}`));
+} catch (e) { out.push("THROWN " + e.message); } document.getElementById("out").textContent = out.join("\n"); })();
+</script></body></html>

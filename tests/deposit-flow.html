@@ -15,6 +15,7 @@ f.onload = async () => { try {
   out.push(`offer mentions the deposit: ${/marrying/.test(txt()) && /paid up front/.test(txt())}`);
   const c0 = s.bal.cash; btn(/Accept/).click(); await sleep(80);
   out.push(`deposit taken: ${s.bal.cash > c0 && s.bal.deposits < 0}`, `maud explains the liability: ${/Customer deposits/.test(txt()) && /Revenue didn't move/.test(txt())}`);
+  btn(/Next/).click(); await sleep(50); out.push(`the second box: refund and forfeit, the Cash is real: ${/forfeit/.test(txt()) && /profit isn't until you deliver/.test(txt())}`); // (the lesson is two boxes)
   btn(/Open the Ledger/).click(); await sleep(50);
   out.push(`ledger balance sheet shows Customer deposits: ${/Customer deposits \(grain owed\)/.test(d.getElementById("panelBody").textContent)}`, `still balanced: ${/Assets = Liabilities/.test(d.getElementById("panelBody").textContent)}`, `errors: ${JSON.stringify(errs)}`);
   } catch (e) { out.push("EXCEPTION " + e.message); }

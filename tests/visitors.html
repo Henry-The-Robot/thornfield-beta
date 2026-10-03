@@ -11,6 +11,7 @@ f.onload = async () => {
   w.G.talk("pell"); await sleep(50); out.push(`pell asks: ${/short/.test(txt()) && /Midwinter/.test(txt())}`);
   btn(/quarter of what the pigs fetch/).click(); await sleep(80);
   out.push(`maud explains the promise: ${/Gross profit/.test(txt()) && /promise/.test(txt())}`, `promise recorded: ${s.promises.length === 1}`, `pell order open at 3: ${s.orders.some(o => o.who === "pell" && o.price === 3)}`);
+  btn(/Next/).click(); await sleep(50); out.push(`maud's second box says it is not Cash, a bill or Revenue: ${/isn't Cash/.test(txt())}`); // (the lesson is two boxes of two sentences)
   btn(/Open the Ledger/).click(); await sleep(50);
   out.push(`ledger lists it under Promised, not booked: ${/Promised, not booked/.test(d.getElementById("panelBody").textContent)}`); w.G.hidePanel(); w.G.closeDlg();
   while (s.day < 13) S.sleep(s);

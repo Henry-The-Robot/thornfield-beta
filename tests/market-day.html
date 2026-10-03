@@ -36,7 +36,7 @@ function load(q, w, h) { return new Promise(res => { const f = document.createEl
     P(`takings ${t.revenue}, units ${t.units}; Cash +${s.bal.cash - cash0} (${s.bal.cash - cash0 === t.revenue}); Revenue +${-s.bal.revenue - rev0}; barn ${sacks0} -> ${s.sacks} (${sacks0 - s.sacks === t.units}); unsold ${t.unsold} stay in the barn`);
     P(`books tie: Assets ${bs.assets} = Liabilities + Equity ${bs.liab + bs.equity}: ${bs.assets === bs.liab + bs.equity}; cash-flow reconciles: ${cl.cf.reconciles}; Inventory ties to the barn: ${s.bal.inv === s.sacks * 4 + s.seeds * 12 + s.plots.filter(p => p.crop).length * 12}`);
     P(`transcript: demand ${w.Transcript.state("demand")}, segments ${w.Transcript.state("segments")}, competitor ${w.Transcript.state("competitor")} (none on day 7)`);
-    click("mk-done"); await sleep(30);
+    click("mk-done"); await sleep(140); G.closeDlg(); // (after the first fair Maud's opportunity-cost bet comes up: market-t6.html covers it)
     P(`pack up closes the overlay: ${!M.isOpen() && !d.getElementById("mkt")}; the ribbon button is gone for today: ${!d.querySelector("[data-mk=go]")}; fair remembered: ${s.market.fairs.length === 1}`);
     G.interactTile(38, 19); await sleep(60); P(`tapping the stall again today: Maud says it is done: ${/had your fair today/.test(d.getElementById("dlg").textContent)}`); G.closeDlg();
     // day 14: Grisby and Maud's bet

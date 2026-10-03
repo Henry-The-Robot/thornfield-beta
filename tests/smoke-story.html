@@ -13,6 +13,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 function load(q) { return new Promise(res => { const f = document.createElement("iframe"); f.style.width = "1280px"; f.style.height = "800px";
   f.onload = () => { f.contentWindow.addEventListener("error", e => errs.push(e.message)); res([f, f.contentWindow]); }; f.src = "../game.html" + q; document.getElementById("frames").appendChild(f); }); }
 const vis = el => el && el.offsetParent !== null && getComputedStyle(el).display !== "none";
+// Editor pass: the longest run of dialogue boxes the player must click through without making a choice, per game day (a choice = 2+ buttons or a typed number)
+const runs = {}, runBoxes = {}; let run = 0, lastSig = "", cur = [], runDay = 0; // (a run ends when the game day changes: the bot-played days between story beats are free play)
+const newDay = w => { const d = w.G.s.day; if (d !== runDay) { runDay = d; run = 0; cur = []; } };
 let tl = 0, tags = 0, typed = 0, boards = 0, picks = 0, haggles = 0, named = 0;
 function pump(w) { // do the one thing the screen is asking for; true if something was done
   const d = w.document, panel = d.getElementById("panel"), dlg = d.getElementById("dlg");
@@ -20,15 +23,17 @@ function pump(w) { // do the one thing the screen is asking for; true if somethi
   if (panel.style.display !== "none") {
     const click = id => { const b = d.getElementById(id); if (b) { b.click(); return true; } };
     if (d.getElementById("tlLow") && w.__tl) { d.getElementById("tlLow").value = w.__tl.low; d.getElementById("tlDay").value = w.__tl.day; tl++; return click("tlok"); } // WS3 timeline
-    if (click("tlok2") || click("tlok")) { tl++; return true; }
+    if (click("tlok2") || click("tlok")) { tl++; run = 0; cur = []; return true; }
     const pcl = d.querySelector("#panelBody .pclose"); if (pcl) { pcl.click(); return true; } // a reference panel opened by a "Later/Open the Ledger" lesson
+    newDay(w); if (d.getElementById("rnext") && lastSig !== "rnext:" + d.getElementById("mline").textContent) { lastSig = "rnext:" + d.getElementById("mline").textContent; run++; cur.push("[panel] " + d.getElementById("mline").textContent.slice(0, 60)); const dy = w.G.s.day; if (run > (runs[dy] || 0)) { runs[dy] = run; runBoxes[dy] = cur.slice(); } }
     if (click("pgok") || click("rnext") || click("pclose")) return true;
-    const ins = d.querySelectorAll("#panelBody input.fc"); if (d.getElementById("bok")) { ins.forEach(x => x.value = x.dataset.ans); boards++; return click("bok"); }
-    if (w.__pick) { const r = d.querySelector(`#cft tr[data-line="${w.__pick}"]`); if (r) { r.click(); picks++; return true; } }
+    const ins = d.querySelectorAll("#panelBody input.fc"); if (d.getElementById("bok")) { ins.forEach(x => x.value = x.dataset.ans); boards++; run = 0; cur = []; return click("bok"); }
+    if (w.__pick) { const r = d.querySelector(`#cft tr[data-line="${w.__pick}"]`); if (r) { r.click(); picks++; run = 0; cur = []; return true; } }
     return false;
   }
   if (dlg.style.display === "flex") {
     const btns = [...dlg.querySelectorAll("button")].filter(b => !b.disabled), num = d.getElementById("num");
+    { newDay(w); const sig = dlg.textContent; if (sig !== lastSig) { lastSig = sig; if (num || dlg.querySelectorAll("button").length >= 2) { run = 0; cur = []; } else { run++; cur.push(sig.replace(/\s+/g, " ").slice(0, 70)); const dy = w.G.s.day; if (run > (runs[dy] || 0)) { runs[dy] = run; runBoxes[dy] = cur.slice(); } } } }
     if (num && w.__want !== undefined) { num.value = w.__want; typed++; btns[0].click(); return true; }
     if (num) { const a = btns.find(b => /Accept/.test(b.textContent)); haggles++; (a || btns[0]).click(); return true; }
     const pref = btns.find(b => /Offer \d+ \(half\)|^.?\d?Continue/.test(b.textContent)); (pref || btns[0]).click(); return true;
@@ -47,7 +52,7 @@ async function drive(w, until) {
     if (pump(w)) continue;
     if (St.busy) continue;
     if (G.s.over) { if (w.document.getElementById("goEzra")) return { seen }; continue; }
-    const s = G.s;
+    const s = G.s; run = 0; cur = []; // the player is acting in the world (walking, planting, shipping, sleeping): a new run starts after this
     switch (stage) {
       case "harvest2": { const p = s.plots.find(p => p.crop && w.Spring.stage(s, p) === 4); if (p) G.interactTile(p.x, p.y); break; }
       case "tomas2": case "tomas6": G.talk("tomas"); break;
@@ -106,6 +111,7 @@ async function drive(w, until) {
     log(`Desk/Road: ${road} desk-only HUD boxes hidden on the road`);
     log(`Try beats with a missing or misplaced setting: ${w.__badAsks.length} ${JSON.stringify(w.__badAsks)}`);
     // WS6: the four-week frame, the case board, the name, the ribbon, the seeded events
+    { const days = Object.keys(runs).map(Number).sort((a, b) => a - b), worst = Math.max(0, ...days.map(d => runs[d])); log(`dialogue runs (boxes in a row without a choice), longest per day: ${days.map(d => "d" + d + ":" + runs[d]).join(" ")}; overall longest ${worst}${worst > 4 ? " FAIL: more than 4 in a row on day(s) " + days.filter(d => runs[d] > 4).join(",") : " (<= 4: ok)"}`); days.filter(d => runs[d] > 4).forEach(d => log(`  day ${d} run of ${runs[d]}: ${runBoxes[d].join(" | ")}`)); }
     log(`WS6 seed ${w.G.s.seed}: event nights ${JSON.stringify(w.G.s.events)} (stored in the save: ${!!JSON.parse(w.localStorage.getItem("lc_spring_save_v3") || "{}").s})`);
     log(`WS6 weeks: cards shown for weeks ${JSON.stringify(st.weeks)}; farm "${st.farm}" (name overlay clicked ${named}x); ribbon "${d.getElementById("goal").textContent}"`);
     log(`WS6 case board: ${st.clues.length} clues pinned: ${st.clues.map(c => c.id).join(", ")}; Crane's offer pinned ${st.clues.some(c => c.id === "offer")}; Crane=Vane clue absent (canon: he is only a messenger) ${!st.clues.some(c => c.id === "crane-vale")};Edric's page 6 pinned ${st.clues.some(c => c.id === "page5")}; case button "${(d.getElementById("casebtn") || {}).textContent}"`);

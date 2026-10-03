@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.4.1 candidate: editor pass and day loop (work order items 6-8)
+- Every Maud box is at most two sentences (27 lines fixed or split); the longest choiceless run in the story is 4 boxes (was 5); `test-editor.js` keeps both true.
+- Teaching-line audit against the curriculum foundation: Crane's equity question, the Market Day price-rise explanation, the guarantee as a contingent liability, the standing-order wording. See `docs/EDITOR-REPORT.md`.
+- Day loop: every day 2-28 has a choice and a surprise or set piece over 40 seeds. Notices recur (trader 3/6/10/25, hands 4/12/16), rain counts, the notice board shows a red "!". `test-dayloop.js`, `day-loop.html`.
+- `?v=` 0.4.1.
+
+## T4: The Reeve's Court (the exam and the finale, day 28)
+- `court.js` + `court.css`: Vane's advocate makes 8 claims built from the player's own statements (profit is not Cash, receivables, "owns nothing", "Edric was unprofitable", the Duke's terms vs wages, a guarantee is a liability, payable-on-demand, margin vs markup, inventory, equity). PRESS for detail (it can turn up evidence), PRESENT a statement line, a case-board clue or a found card. Refute 6 of 8 to pass; a failed hearing offers another sitting with a fresh set of claims, never a game over.
+- Crane (trust 3+) testifies once (a free correct present); Ezra (trust 3+) confirms his rate. One Maud line per refuted claim (claim, number, reason); transcript evidence only for unhinted right presents.
+- Pass: certificate (farm name, score, date) -> letter "The thing I signed" -> Crane reads the seal -> Vane's offer comes due (your answer is saved as `vaneFinal`) -> Summer teaser reading the saved flags.
+- Called by `closeBooks()` with `{G, s, Story, Endings, st}`; standalone: `game.html?court=1` (careful-bot season). Tests: `test-court.js`, `court.html`. Screenshots in `docs/court-shots/`.
+## T3b: story critic fixes
+- Sold-out epilogue no longer compares the offer with a bot's "careful" run or claims it was too low. It sets the price beside what the farm EARNS (Cash cleared this spring, or profit while that is still in grain and invoices) and beside book equity, and says the land isn't on the books.
+- Crane's offer now rises with the Cash the farm's operations have cleared and falls with the days the forecast shows the chest empty (documented in endings.js, tested both ways); book equity no longer moves it.
+- The Tomas-vs-Ezra verdict uses the discount the engine books and whole coins, one number per sentence.
+- Every Maud box is at most two sentences; every Crane line is in "Item:" sentences (story, scenes, cast).
+- Wording: "You must be the heir"; the second order says "delighted with the first" only if you took it; Edric's page says "the same kind of order".
+- The ending card, week card and Court count as screens for the stall detector; the Sold ending has a Close button; `?ending=` previews a copy and writes no unlock.
+- Edric's cash book: one row per day, profit / Cash cleared / tied up in grain and unpaid invoices (Inventory + Receivables - Payables - Deposits).
+- No "(coming)" text; the day-28 goal mentions the Reeve's Court. Tests: `test-t3b.js`, `test-offer.js` updated.
+## Creative calls 1-5 (docs/TASKS-season1.md)
+1. **Week 4:** Maud stops teaching (no daily problem, no menu of lessons; her story scenes and danger warnings still play). The daily problem comes from Ezra, with no Explain-how button; he earns trust for right answers.
+2. **Letters** list in the order you found them (day found shown), and "The thing I signed" is always last.
+3. **Clue cards:** title + your number + where found, at most 12 words in all (trimmed automatically; the six scene cards are authored to fit).
+4. **Market Day** is on days 7, 14 and 21 only; day 28 belongs to the Court (story and sandbox).
+5. **Crane's one voice** ("Item:" sentences) is in the T3b PR.
+- Tests: `test-calls.js`, `week4.html`; `test-market-day.js` updated.
+## T5: practice as play
+- **Standing orders** (`standing.js`): one or two repeatable contracts a day (days 3-26) on the notice board from Ashby, Hobb and Mira. Check one first (margin, the road trader's price for the same sack, the seed it needs and what that leaves in Cash, when the money arrives), then take it (haggled and shipped like any order) or pass. Some are traps: **thin** (no better than the best alternative sale), **slow** (the Cash lands after the season, or the next pay-day finds the chest short) and orders the chest **can't carry**. The verdict names which; a good take after the check, or a trap checked and passed, is transcript evidence.
+- **Maud's daily problem is now an optional wager:** stake 0-3 coin before seeing it; right on the first answer and it comes back doubled, anything else Maud keeps it. Real Cash, posted so the books tie. Never a gate.
+- **Four new problem types** for the foundation fixes: opportunity-cost floor, the time-value flip (answer changes with Ezra's rate), the scaling gap (tied-up Cash doubles with sales) and expected value vs ruin (an EV number, then "is it safe?"). Transcript gains "Opportunity cost" and "Expected value & ruin".
+- Tests: `test-standing.js`, `standing-ui.html`, `test-practice.js` extended.
+## T6 + T6b: the frost almanac, the real floor, break-even, Grisby with teeth
+- **Frost almanac (expected value vs ruin).** The evening before the frost the notice board gives the odds of a HARD frost (1 in 3) and the price of straw (5 a plot). Cover (certain cost, crops safe) or risk it (on average cheaper, but a hard frost kills every uncovered crop, written off at cost). After the choice Maud sets the average against the certain price and says whether losing the crops would have cost you your Crown verdict. Only a player who answers is exposed, so unattended play (bots, sandbox tuning) is unchanged. Transcript: "Expected value & ruin".
+- **Opportunity-cost floor bet** after the first Market Day: Ashby offers 5, above the sack's cost; what is the lowest price worth taking? (The fair paid more.) Optional stake through Maud's usual bet. Transcript: "Opportunity cost".
+- **Break-even cell** in every tally: "you kept N a sack; the week's wages and interest are W; how many sacks cover it?" Two tries, evidence only for a first-try answer.
+- **Grisby matters:** above the going price he undercuts by 2 (was 1); he brings a limited stock (24 in week 2, only 5 in week 3), so he sells out part-way through the week-3 afternoon. His board shows what he asked, his stock left and what he took (and how much of it was really yours).
+- **Market Day critic fixes (T6b):** Maud's bet is settled on every path (a fair quit part-way refunds the stake); Grisby's sales are capped by his stock; the demand chart leaves off earlier fairs played under the other rival condition and earlier sold-out hours; Transcript credit for demand/segments needs a price change that RAISED takings; "takings would up" reads rise/fall/stay the same.
+- Tests: `test-frost.js`, `test-market-day.js` (Grisby stock, experiment, bet settlement), `market-t6.html`.
+
 All notable changes to Spring at Thornfield. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [v0.4.0-beta (candidate)]

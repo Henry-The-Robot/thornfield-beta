@@ -8,28 +8,28 @@ window.Cast = (function () {
       name: "Maud Fenwick, the reeve", look: "Grey braid, green wool, a wooden abacus she keeps on the desk and never touches.",
       habit: "Answers a question with a question. Never says 'good'; says 'That's not wrong.'", mantra: "Profit is an opinion. Cash is a fact.",
       voice: "dry, exact, kind underneath",
-      greet: ["Mm. Count it again.", "You look like a person with a question. Ask it better.", "Cash first. Then opinions.", "I'm not here to be thanked. I'm here to be right.", "Do you know what's in the chest? Not what you hope. What's in it.",
+      greet: ["Mm. Count it again.", "You look like a person with a question. Ask it better.", "Cash first. Then opinions.", "I'm not here to be thanked. I'm here to be right.", "Do you know what's in the chest? Not what you hope, what's in it.",
         "The Ledger flatters. The chest does not."],
-      low: ["You're thin on Cash. Don't tell me it's fine. Tell me what's due on the seventh.", "A short chest and a long list. I've seen that picture before."],
-      rich: ["A fat chest. Whose Cash is it, really? Anything you owe come due before Midwinter?"], rain: ["Rain. Good for the crops, bad for everyone's temper. Mind the ledger anyway."],
+      low: ["You're thin on Cash, and don't tell me it's fine: what's due on the seventh?", "A short chest and a long list. I've seen that picture before."],
+      rich: ["A fat chest: whose Cash is it, really, and what falls due before Midwinter?"], rain: ["Rain is good for the crops and bad for everyone's temper. Mind the ledger anyway."],
       topics: [
-        { id: "abacus", label: "Ask about the abacus", lines: ["That? Oh, it's accurate. Beautifully accurate. It's the only honest instrument in Thornfield.", "I don't use it. It lies slowly. Your uncle used to say a ledger lies quickly and an abacus lies slowly. He was never certain which he preferred."] },
-        { id: "edric", label: "Ask what Edric was like", need: { trust: 3 }, lines: ["Edric? He was the most generous man I ever argued with.", "He'd give you the coat off his back and then forget he'd done it. Then he'd wonder why he was cold. I told him a hundred times: a farm is not a charity.", "He nodded every time. And the next week he'd give away something else."] },
-        { id: "why", label: "Ask why she's helping you", need: { trust: 5 }, lines: ["Because I was his friend. Because someone should have stopped him. Because I was somewhere else when it mattered.", "That's three reasons. Pick the one that lets you sleep."] },
-        { id: "mantra", label: "Ask what she believes about money", need: { trust: 2 }, lines: ["Profit is an opinion. Cash is a fact.", "The Ledger tells you what you think you earned. The chest tells you what you can pay on the seventh. Only one of those feeds the hands."] },
+        { id: "abacus", label: "Ask about the abacus", lines: ["That? Oh, it's beautifully accurate: the only honest instrument in Thornfield.", "I don't use it, because it lies slowly. Your uncle used to say a ledger lies quickly and an abacus lies slowly, and he was never certain which he preferred."] },
+        { id: "edric", label: "Ask what Edric was like", need: { trust: 3 }, lines: ["Edric? He was the most generous man I ever argued with.", "He'd give you the coat off his back, forget he had, and wonder why he was cold. I told him a hundred times that a farm is not a charity.", "He nodded every time. And the next week he'd give away something else."] },
+        { id: "why", label: "Ask why she's helping you", need: { trust: 5 }, lines: ["Because I was his friend, because someone should have stopped him, and because I was somewhere else when it mattered.", "That's three reasons. Pick the one that lets you sleep."] },
+        { id: "mantra", label: "Ask what she believes about money", need: { trust: 2 }, lines: ["Profit is an opinion. Cash is a fact.", "The Ledger tells you what you think you earned, and the chest tells you what you can pay on the seventh. Only one of those feeds the hands."] },
       ],
     },
     crane: {
       name: "Bailiff Crane", look: "Black coat, a ledger under one arm, pen behind each ear in case one fails.",
       habit: "Numbers his sentences. Counts everything twice. Is polite in the way a locked door is polite.", mantra: "Everything is somebody's.",
       voice: "formal, pedantic, accidentally funny",
-      greet: ["Item: you are standing in my light. Item: I do not mind. Carry on.", "I am not following you. I am merely going where you are, shortly after.", "Everything is somebody's, heir. Including that fence.",
-        "For the record, I counted your sacks. Fifteen. Then again. Still fifteen."],
-      low: ["Your chest is light. That is not a threat. I am only observing it, twice."], rich: ["Your chest is heavy. I note it. I do not comment. I comment a little."], rain: ["Rain. Item: it is wetter than yesterday."],
+      greet: ["Item: you are standing in my light. Item: I do not mind. Item: carry on.", "Item: I am not following you. Item: I am merely going where you are, shortly after.", "Item: everything is somebody's, heir. Item: including that fence.",
+        "Item: your sacks, fifteen. Item: counted again, still fifteen."],
+      low: ["Item: your chest is light. Item: that is not a threat; I am only observing it, twice."], rich: ["Item: your chest is heavy. Item: I do not comment. Item: I comment a little."], rain: ["Item: rain. Item: it is wetter than yesterday."],
       topics: [
-        { id: "job", label: "Ask what a bailiff does", lines: ["I count what is owed and what is owned, and I write down the difference without opinion. The difference is the only part anyone argues about.", "I'm told it is a lonely profession. I have never had time to check."] },
-        { id: "clerk", label: "Ask where he worked before", need: { trust: 4 }, lines: ["The Duke's counting-house. Eleven years. I was a good clerk.", "Then one winter I noticed that two columns which ought to agree did not. I mentioned it. Once. In writing.", "I was transferred. To the bailiffs. It is considered a promotion. It is not."] },
-        { id: "edric", label: "Ask what he thought of Edric", need: { trust: 5 }, lines: ["He was the only farmer who ever offered me a chair.", "He kept dreadful books and a clear conscience. I would have traded him the second for the first."] },
+        { id: "job", label: "Ask what a bailiff does", lines: ["Item: I count what is owed and what is owned. Item: I write down the difference without opinion; the difference is the only part anyone argues about.", "Item: I am told it is a lonely profession. Item: I have never had time to check."] },
+        { id: "clerk", label: "Ask where he worked before", need: { trust: 4 }, lines: ["Item: the Duke's counting-house, eleven years. Item: I was a good clerk.", "Item: one winter, two columns which ought to agree did not. Item: I mentioned it, once, in writing.", "Item: I was transferred to the bailiffs. Item: it is considered a promotion. Item: it is not."] },
+        { id: "edric", label: "Ask what he thought of Edric", need: { trust: 5 }, lines: ["Item: he was the only farmer who ever offered me a chair.", "Item: he kept dreadful books and a clear conscience. Item: I would have traded him the second for the first."] },
       ],
     },
     ashby: {
@@ -125,5 +125,7 @@ window.Cast = (function () {
       .map(t => ({ id: t.id, label: t.label, lines: t.lines, heard: !!s.heard[who + ":" + t.id] }));
   }
   const locked = (who, s) => { const c = WHO[who]; if (!c || !c.topics) return 0; return c.topics.length - topics(who, s).length; };
-  return { WHO, greet, topics, locked, name: id => WHO[id] ? WHO[id].name : id };
+  // a one-word name for a clue card's source: "Maud Fenwick, the reeve" -> Maud, "Tomas the seed merchant" -> Tomas, "Bailiff Crane" -> Crane
+  const short = id => { const n = (WHO[id] ? WHO[id].name : id).split(",")[0], w = n.split(" "); return / the /.test(n) || w.length === 1 ? w[0] : w[w.length - 1]; };
+  return { WHO, greet, topics, locked, short, name: id => WHO[id] ? WHO[id].name : id };
 })();
