@@ -28,6 +28,9 @@ Summer's numbers as data, in the shape of Spring's `season.js`. It starts from S
 | `testPlot` | One plot, 30% good odds, pass line locked first (SU7). |
 | `scarce`, `gift`, `banner` | Cart slots (SU4); the clerk's gift and Ashby's penalty clause (SU8). |
 
+## Start state (SM3)
+`Save.startFrom("ch1/spring")` returns `closed["ch1/spring"].next`, or `Save.heir()` when there is none. `newGame({ carry })` opens Summer with that record's cash, Ezra and Crown debts, relations and flags. Test: `tests/test-summer-start.js`.
+
 ## Invariants
 Hand checks in `tests/test-summer-season.js`: tally 984, interest 9.984, unit costs 20 and 15, elasticity 1.09.
 
