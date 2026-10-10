@@ -4,7 +4,8 @@
 <script>
 const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
 const load = q => new Promise(r => { const f = document.createElement("iframe"); f.style.cssText = "width:1194px;height:834px;border:0"; f.src = "../game.html" + q; document.body.appendChild(f); f.onload = () => r(f); });
-function spy(w) { const made = []; w.Audio = function (src) { const a = { src, playing: false, paused: true, ended: false, loop: false, volume: 1, ls: {}, play() { a.playing = true; a.paused = false; return Promise.resolve(); }, pause() { a.paused = true; a.playing = false; }, addEventListener(n, fn) { (a.ls[n] = a.ls[n] || []).push(fn); }, finish() { a.ended = true; a.paused = true; (a.ls.ended || []).forEach(fn => fn()); } }; made.push(a); return a; }; return made; }
+function spy(w) { const made = []; if (w.FX) w.FX.ctx = () => null; // force the <audio> element path so the fake can watch it (section 3 checks the WebAudio path)
+  w.Audio = function (src) { const a = { src, playing: false, paused: true, ended: false, loop: false, volume: 1, ls: {}, play() { a.playing = true; a.paused = false; return Promise.resolve(); }, pause() { a.paused = true; a.playing = false; }, addEventListener(n, fn) { (a.ls[n] = a.ls[n] || []).push(fn); }, finish() { a.ended = true; a.paused = true; (a.ls.ended || []).forEach(fn => fn()); } }; made.push(a); return a; }; return made; }
 (async () => { try {
   const errs = [];
   // 1. ?vo=1: Begin starts the opening; the first voice file and the rain loop are created and playing
@@ -13,7 +14,7 @@ function spy(w) { const made = []; w.Audio = function (src) { const a = { src, p
   d.getElementById("in-go").click(); await sleep(1800);
   const names = made.map(a => a.src.split("/").slice(-1)[0]);
   out.push(`with ?vo=1 an Audio element for i01.mp3 was created and plays: ${names.includes("i01.mp3") && made[names.indexOf("i01.mp3")].playing}`);
-  const rain = made.find(a => /rain\.mp3/.test(a.src)); out.push(`the rain loops at 25% volume under shot 0: ${!!rain && rain.loop && Math.abs(rain.volume - .25) < .01 && rain.playing}`);
+  out.push(`the opening keeps its built-in sounds (no sound-effect files): ${!made.some(a => /\/sfx\//.test(a.src))}`);
   // jump to just before line i08 (47.0 s) with i07 playing: i08 must wait
   made.forEach(a => { if (/voice/.test(a.src)) a.finish(); }); w.Intro.debug.seek(40.5); await sleep(120); w.Intro.debug.release(); await sleep(200);
   const i07 = made.find(a => /i07\.mp3/.test(a.src)); w.Intro.debug.seek(47.1); await sleep(150);
@@ -21,7 +22,7 @@ function spy(w) { const made = []; w.Audio = function (src) { const a = { src, p
   if (i07 && i08) { i07.finish(); await sleep(50); out.push(`and starts when i07 ends: ${i08.playing}`); }
   // seal at 33.0 s and the others are reachable by time; the gate/coins files appear when their time comes
   w.Intro.debug.seek(4.6); await sleep(150); w.Intro.debug.release(); await sleep(150);
-  out.push(`the gate file plays at 4.5 s: ${made.some(a => /gate\.mp3/.test(a.src) && a.playing)}`);
+  out.push(`no sound-effect file plays at 4.5 s either: ${!made.some(a => /\/sfx\//.test(a.src))}`);
   // Skip stops every file that is playing
   const live = made.filter(a => a.playing).length; d.getElementById("in-skip").click(); await sleep(500);
   out.push(`${live} files were playing; after Skip none is: ${live > 0 && made.every(a => !a.playing)}`);
@@ -31,6 +32,14 @@ function spy(w) { const made = []; w.Audio = function (src) { const a = { src, p
   f = await load("?intro=1&new=1&savetest=1"); w = f.contentWindow; d = w.document; w.addEventListener("error", e => errs.push(e.message)); await sleep(400);
   made = spy(w); d.getElementById("in-go").click(); await sleep(1800); d.getElementById("in-skip").click(); await sleep(300);
   out.push(`without ?vo=1 no voice or sound file is requested: ${made.length === 0}`);
+  f.remove();
+  // 3. iPad path: with a WebAudio context the files play as decoded buffers through the shared context (an <audio> element started by a timer is silent on iPad Safari)
+  f = await load("?vo=1&intro=1&new=1&savetest=1"); w = f.contentWindow; d = w.document; w.addEventListener("error", e => errs.push(e.message)); await sleep(400);
+  d.getElementById("in-go").click(); await sleep(2500);
+  const st3 = w.Cutscene.state, first = st3 && st3.audios[0];
+  out.push(`with a WebAudio context the first voice line is a decoded buffer, not an <audio> element: ${!!first && first.kind === "webaudio" && /i01\.mp3$/.test(first.src)}`);
+  out.push(`and it is playing: ${!!first && first.playing}`);
+  d.getElementById("in-skip").click(); await sleep(300); out.push(`Skip stops it: ${!!first && !first.playing}`);
   out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
 } catch (e) { out.push("THROWN " + e.message + " " + (e.stack || "").split("\n")[1]); } document.getElementById("out").textContent = out.join("\n"); })();
 </script></body></html>

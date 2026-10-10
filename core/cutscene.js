@@ -50,23 +50,51 @@
   // ---------- playback ----------
   let st = null, voiceBase = null, voiceExt = "mp3", active = false;
   const sound = name => { try { if (window.FX && FX.sfx) FX.sfx(name); } catch (e) {} };
+  // ---------- voice and sound files (?vo=1) ----------
+  // iPad Safari only plays sound a tap started. A file started seconds later by the timeline is blocked when it is an <audio> element, so files play
+  // through the ONE shared WebAudio context that the first tap unlocks (core/fx.js), decoded in advance. No context (old browser, tests): an <audio> element.
+  const bufs = {};
+  const wac = () => { try { return window.FX && FX.ctx ? FX.ctx() : null; } catch (e) { return null; } };
+  function load(src) { const a = wac(); if (!a || !window.fetch) return null;
+    if (!bufs[src]) bufs[src] = fetch(src).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(b => new Promise((res, rej) => a.decodeAudioData(b, res, rej))).catch(() => null);
+    return bufs[src]; }
+  function preload(def) { if (!voiceBase) return; (def.lines || []).forEach(l => load(`${voiceBase}/${l.id}.${voiceExt}`)); (def.sfxFiles || []).forEach(f => load(f.src)); }
+  function clip(src, vol, loop) { // {play, stop, vol(v), after(fn), ended, kind}
+    const a = wac(), c = { ended: false, playing: false, stopped: false, wait: [], src };
+    const fin = () => { if (c.ended) return; c.ended = true; c.playing = false; c.wait.splice(0).forEach(f => f()); };
+    if (a && load(src)) {
+      c.kind = "webaudio"; const g = a.createGain(); g.gain.value = vol; g.connect(a.destination); let node = null;
+      c.play = () => { load(src).then(buf => { if (c.stopped) return; if (!buf) return fin(); try { if (a.state !== "running") a.resume(); } catch (e) {}
+        node = a.createBufferSource(); node.buffer = buf; node.loop = !!loop; node.connect(g); node.onended = fin; node.start(0); c.playing = true; }); };
+      c.stop = () => { c.stopped = true; try { if (node) node.stop(); } catch (e) {} fin(); };
+      c.vol = v => { try { g.gain.value = v; } catch (e) {} };
+    } else {
+      c.kind = "element"; const el = new Audio(src); el.volume = vol; el.loop = !!loop; c.el = el; el.addEventListener("ended", fin);
+      c.play = () => { c.playing = true; const p = el.play(); if (p && p.catch) p.catch(fin); };
+      c.stop = () => { c.stopped = true; try { el.pause(); } catch (e) {} fin(); };
+      c.vol = v => { el.volume = v; };
+    }
+    c.after = f => { if (c.ended) f(); else c.wait.push(f); };
+    return c;
+  }
   function say(l) { // a line starts: subtitle, and the voice file if one is set
     if (!st) return; const el = st.sub; el.innerHTML = `<span class="in-who">${l.who}</span><span class="in-txt">${l.text}</span>`; el.classList.add("on"); st.line = l.id; st.said.push(l.id);
-    if (voiceBase) try { const a = new Audio(`${voiceBase}/${l.id}.${voiceExt}`); a.volume = 1; const prev = st.audio; st.audio = a; st.audios.push(a); // a line waits for the one before it to finish (i08 follows i07)
-      const go = () => { if (!st) return; const p = a.play(); if (p && p.catch) p.catch(() => {}); };
-      if (prev && !prev.paused && !prev.ended) prev.addEventListener("ended", go, { once: true }); else go(); } catch (e) {}
+    if (voiceBase) try { const c = clip(`${voiceBase}/${l.id}.${voiceExt}`, 1, false), prev = st.audio; st.audio = c; st.audios.push(c); // a line waits for the one before it to finish (i08 follows i07)
+      let fired = false; const go = () => { if (fired || !st || st.audios.indexOf(c) < 0) return; fired = true; c.play(); };
+      if (prev && !prev.ended) { prev.after(go); setTimeout(go, 2500); } else go(); } catch (e) {} // never wait more than 2.5 s behind a line that is stuck
+
   }
   // files that replace synth cues in voice mode: def.sfxFiles = [{ src, at, vol, loop, until, mute: { shotIndex: [cueIndex, ...] } }] (at/until are seconds from the start)
   function sfxFiles(t) {
     if (!voiceBase || !st.def.sfxFiles) return;
     st.def.sfxFiles.forEach((f, i) => {
       let r = st.sfx[i], v = f.vol == null ? 1 : f.vol;
-      if (!r && t >= f.at && (f.until == null || t < f.until)) { try { const a = new Audio(f.src); a.volume = v; a.loop = !!f.loop; st.audios.push(a); const p = a.play(); if (p && p.catch) p.catch(() => {}); r = st.sfx[i] = { a }; } catch (e) { r = st.sfx[i] = {}; } }
-      if (r && r.a && f.until != null) { if (t >= f.until) r.a.pause(); else if (t > f.until - 1) r.a.volume = Math.max(0, v * (f.until - t)); }
+      if (!r && t >= f.at && (f.until == null || t < f.until)) { try { const c = clip(f.src, v, f.loop); st.audios.push(c); c.play(); r = st.sfx[i] = { a: c }; } catch (e) { r = st.sfx[i] = {}; } }
+      if (r && r.a && !r.a.stopped && f.until != null) { if (t >= f.until) r.a.stop(); else if (t > f.until - 1) r.a.vol(Math.max(0, v * (f.until - t))); }
     });
   }
   const sfxMuted = (si, ci) => !!(voiceBase && st.def.sfxFiles && st.def.sfxFiles.some(f => f.mute && f.mute[si] && f.mute[si].indexOf(ci) >= 0));
-  function stopAudio(s) { try { (s.audios || []).forEach(a => a.pause()); } catch (e) {} }
+  function stopAudio(s) { try { (s.audios || []).forEach(a => a.stop()); } catch (e) {} }
   function step(now) {
     if (!st) return; const def = st.def, tl = st.tl; const dt = Math.min(.1, (now - (st.last || now)) / 1000); st.last = now; if (!st.hold) st.t += dt * st.speed;
     const t = st.t; if (t >= tl.total) return end("done");
@@ -92,6 +120,7 @@
     const start = () => { if (!st) return; if (go && !go.isConnected) return; try { if (window.FX) FX.unlock(); } catch (e) {} const g = root.querySelector("#in-gate"); if (g) g.remove(); st.last = performance.now(); st.raf = requestAnimationFrame(step); };
     const key = e => { if (e.key === "Escape") { e.stopPropagation(); end("skipped"); } else if ((e.key === "Enter" || e.key === " ") && go && go.isConnected) { e.preventDefault(); e.stopPropagation(); start(); } else e.stopPropagation(); }; // (the game underneath hears no keys while a cutscene is up)
     st = { def, tl: timeline(def), t: 0, last: 0, speed: opts.speed || 1, hold: !!opts.hold, root, sub: root.querySelector("#in-sub"), shot: -1, cueI: 0, line: null, said: [], fired: [], audios: [], sfx: [], key, done, raf: 0, promise };
+    preload(def); // voice mode: fetch and decode every file now, so each plays on time once the first tap has unlocked the shared context
     document.addEventListener("keydown", key, true); root.querySelector("#in-skip").onclick = () => end("skipped");
     frame(def, 0); if (go) go.onclick = start; if (opts.autostart || !go) start(); if (go) setTimeout(() => go.isConnected && go.focus({ preventScroll: true }), 30);
     return promise;

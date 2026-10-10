@@ -11,7 +11,8 @@ const load = q => new Promise(r => { const f = document.createElement("iframe");
   out.push(`Skip is at least 44px: ${d.getElementById("in-skip").getBoundingClientRect().height >= 44 && d.getElementById("in-skip").getBoundingClientRect().width >= 44}; Begin: ${d.getElementById("in-go").getBoundingClientRect().height >= 44}`);
   // spies: sound effects, the score, the voice
   const sfx = [], moods = [], auds = []; const FX = w.FX, Mu = w.Music, oS = FX.sfx, oM = Mu.setMood; FX.sfx = n => { sfx.push(n); try { oS.call(FX, n); } catch (e) {} }; Mu.setMood = m => { moods.push(m); try { oM.call(Mu, m); } catch (e) {} };
-  w.Audio = function (src) { auds.push(src); return { play() { return Promise.resolve(); }, pause() {}, set volume(v) {} }; }; w.Intro.setVoice("assets/voice/intro");
+  if (w.FX) w.FX.ctx = () => null; // the <audio> element path, so the spy sees each file (tests/voice-opening.html checks the WebAudio path)
+  w.Audio = function (src) { auds.push(src); return { play() { return Promise.resolve(); }, pause() {}, addEventListener() {}, set volume(v) {} }; }; w.Intro.setVoice("assets/voice/intro");
   // play it at 30x (2.5 s of virtual time)
   w.Intro.end("skipped"); await sleep(450); const pr = w.Intro.play({ speed: 30, autostart: true }); await sleep(100);
   out.push(`the opening starts: ${w.Intro.active}, the canvas is on screen: ${!!d.getElementById("in-cv")}`);
