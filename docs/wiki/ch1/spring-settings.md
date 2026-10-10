@@ -15,6 +15,7 @@ updated: 2026-10-05
 ## What it does
 `R` is the one object that holds every number of Season 1: prices, wages, loan terms, the Duke's orders, the calendar of
 events and the Crown's debt. The engine, the story, the bots and the tests all read the same `R`. Nothing here changes during play.
+Which season `R` holds is set by the season registry in `core/engine.js` (SM1): `Spring.Season.register(id, settings)`, `Season.use(id)`, `Season.current`. Spring is `ch1/spring` and active at load. `Season.use` copies a season's settings into the one `R` object. The `OFFERS` calendar is still Spring's (SM2 and later move it into season data). Test: `tests/test-season-registry.js`.
 
 ## Where
 `core/engine.js` · `R` (~8–47). Also `R.pigDay` (derived, right after `R`) and `eventsFor(seed)` (~50).
