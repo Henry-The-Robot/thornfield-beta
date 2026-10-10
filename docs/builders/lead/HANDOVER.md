@@ -1,4 +1,4 @@
-# HANDOVER — mba-game (Ledger & Crown) — updated 2026-10-10 14:10 PT by the local Lead (Opus, `lead:mba-game`)
+# HANDOVER — mba-game (Ledger & Crown) — updated 2026-10-10 15:20 PT by the local Lead (Opus, `lead:mba-game`)
 
 > The Project Lead's only handover. The Lead is a persistent local Opus session in `C:\Users\Kylev\Agent System`; it edits
 > the game in `projects/mba-game/repo` (branch `local/work`). `infra/git_sync_game.py` commits, pushes and keeps one PR
@@ -24,6 +24,13 @@ through WebAudio so iPad works; Kyle liked the voice. The ElevenLabs sfx were dr
 - **Builder** = Sonnet task `game-builder` (hourly, loops cards; kickoff `projects/mba-game/KICKOFF-BUILDER.md`).
 - Card checks: `projects/mba-game/tools/check.py` (pushed + CI green + a file/text condition).
 
+## Session 10-10 15:20
+- Merged PR #58 (SM1 season registry: `Spring.Season.register/use`, test `tests/test-season-registry.js`) after a diff read; CI green.
+- Parked 21 post-Summer Spring extras (S1c-S6d, P9a-P12b) in PLAN.json, so the Builder stops after SU-R1. S4d = duplicate of SU-W11.
+- The Builder runs as ONE long session (started 10-10 02:33Z, 700+ messages); the hourly trigger does not start a second.
+- Stale fact fixed: `curiosity` is enabled, but it and usage-logger have not fired since 10-05. Asked the coordinator
+  (help id 20261010-151702). Until then only a Lead merges.
+
 ## Next 3 actions
 1. Ask Kyle whether every opening line plays on his iPad (v0.4.11) and whether the voice goes game-wide (then make it
    the default and voice the cutscenes; budget: ~60-100 credits a line).
@@ -32,7 +39,7 @@ through WebAudio so iPad works; Kyle liked the voice. The ElevenLabs sfx were dr
    DESIGN.md section 0, merge as v0.5.0, tell Kyle, then pause (Kyle's instruction).
 
 ## Blockers
-- No merge without a Lead session (reviewer disabled). Offered Kyle: re-enable `curiosity`, or ping the Lead.
+- No merge without a Lead session (`curiosity` is enabled but not firing; coordinator asked 10-10).
 - No browser playback on this PC (the built-in pane runs hidden, so cutscene timers stall). CI's Chromium is the proof;
   Kyle's iPad is the final check for sound.
 
