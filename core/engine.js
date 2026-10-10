@@ -5,7 +5,17 @@
 // double-entry method as in OpenStax *Principles of Accounting* Vol. 1, ch. 3). Subledgers (open invoices, open
 // bills, sacks/seed/crops at cost) are kept separately and tested against the ledger accounts every day.
 (function (root) {
-  const R = root.SpringSeason || require("../chapters/ch1/spring/season.js"); // Spring's settings are data: chapters/ch1/spring/season.js
+  // The season registry (SM1). A season's settings are data (chapters/chN/<season>/season.js); a season registers under "chN/<name>" and Season.use(id) makes it the active one.
+  // R is ONE object every function below reads; Season.use copies the chosen season's settings into it, so a season switch is seen everywhere at once (and S.R stays valid).
+  // Spring registers as "ch1/spring" and is active at load, so every Spring game, bot and golden run is unchanged.
+  const R = {}, SEASONS = {}; let activeId = null;
+  const Season = {
+    register(id, settings) { SEASONS[id] = settings; return settings; },
+    use(id) { const next = SEASONS[id]; if (!next) throw new Error("season: unknown " + id); Object.keys(R).forEach(k => delete R[k]); Object.assign(R, next); activeId = id; Object.keys(pathCache).forEach(k => delete pathCache[k]); return R; },
+    get current() { return activeId; }, list: () => Object.keys(SEASONS),
+  };
+  const pathCache = {};
+  Season.register("ch1/spring", root.SpringSeason || require("../chapters/ch1/spring/season.js")); Season.use("ch1/spring"); // Spring's settings: chapters/ch1/spring/season.js (active before any table below reads R)
   // ---------- seeded events (WS6 item 9) ----------
   function eventsFor(seed) { // { day: kind } for one game; mulberry32 (Tommy Ettinger's public-domain 32-bit PRNG) keeps it tiny and reproducible
     if (!seed) return Object.assign({}, R.events);
@@ -38,7 +48,6 @@
 
   // The going price per day for one game's seed (P5 demand model). Seed 0 is the canonical path in the season settings, so every sandbox, bot and test game is unchanged.
   // Another seed adds a drifting demand shock to that path: shock = round(carry * last shock + noise), noise uniform in [-spread, spread] (same mulberry32 as eventsFor).
-  const pathCache = {};
   function pricesFor(seed) {
     seed = seed | 0; if (!seed) return R.market;
     if (pathCache[seed]) return pathCache[seed];
@@ -440,7 +449,7 @@
     return null;
   }
 
-  root.Spring = { R, roll, eventsFor, eventDay, pellDays, pedlarDays, marketPrice, spotPrice, traderPrice, ACCTS, NAMES, OFFERS, newGame, post, balanceSheet, terms, rain, stage, sprinkled, committed, sacksComing, openOrders,
+  root.Spring = { R, Season, roll, eventsFor, eventDay, pellDays, pedlarDays, marketPrice, spotPrice, traderPrice, ACCTS, NAMES, OFFERS, newGame, post, balanceSheet, terms, rain, stage, sprinkled, committed, sacksComing, openOrders,
     weekBills, billsDue, nextWeekEnd, forecast, discNow, addOffer, setPrice, factor, act, accept, decline, deliver, sellSpot, buySeeds, payBills, payOneBill, buySprinkler, wager, wagerWin, sprinklerFacts, buyFence, crownFund, frostFacts, NOTICE_DAYS, preview, notice, answerNotice, marketOutlook, rescue, refusePell, buyPoison, ratLoss, warning, borrow, repay, loanFacts, sleep, coach };
   if (typeof module !== "undefined") module.exports = root.Spring;
 })(typeof window !== "undefined" ? window : globalThis);
