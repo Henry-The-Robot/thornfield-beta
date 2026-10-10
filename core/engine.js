@@ -15,7 +15,7 @@
     get current() { return activeId; }, list: () => Object.keys(SEASONS),
   };
   const pathCache = {};
-  Season.register("ch1/spring", root.SpringSeason || require("../chapters/ch1/spring/season.js")); Season.use("ch1/spring"); // Spring's settings: chapters/ch1/spring/season.js (active before any table below reads R)
+  Season.register("ch1/spring", root.SpringSeason || require("../chapters/ch1/spring/season.js")); Season.use("ch1/spring"); Season.register("ch1/summer", root.SummerSeason || require("../chapters/ch1/summer/season.js")); // Summer registers too (SM2) but stays inactive until Season.use. Spring's settings: chapters/ch1/spring/season.js (active before any table below reads R)
   // ---------- seeded events (WS6 item 9) ----------
   function eventsFor(seed) { // { day: kind } for one game; mulberry32 (Tommy Ettinger's public-domain 32-bit PRNG) keeps it tiny and reproducible
     if (!seed) return Object.assign({}, R.events);
