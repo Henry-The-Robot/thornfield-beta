@@ -1,6 +1,9 @@
-# HANDOVER — Chapter 1 builder — updated 2026-10-09 by game-builder (Sonnet)
+# HANDOVER — Chapter 1 builder — updated 2026-10-10 by game-builder (Sonnet)
 
-## State in one paragraph
+## Latest (2026-10-10)
+SM2 done: `chapters/ch1/summer/season.js` (registered `ch1/summer`; wiki `ch1/summer-settings`; `tests/test-summer-season.js`). SM3 done: `newGame({carry})` and `Save.startFrom(prev)` (`tests/test-summer-start.js`). Both CI green. Next card: `python infra/plan_cards.py next mba-game`. Summer numbers are [Guessing] until bot runs tune them; Summer inherits Spring's engine keys.
+
+## State in one paragraph (older, 2026-10-09)
 Spring is live as v0.4.6. Summer is docs-only until Kyle approves a design. Card U0a is done (`chapters/ch1/summer/CURRICULUM-NOTES.md`). Card U0b is built: `chapters/ch1/summer/DESIGN-DRAFT.md` follows the season design template, with 8 core ideas, week by week, opening, 5 cutscenes, Tender finale, cast, numbers sketch, platform needs, previews and risks.
 
 ## Live / branch state

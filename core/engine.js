@@ -15,7 +15,7 @@
     get current() { return activeId; }, list: () => Object.keys(SEASONS),
   };
   const pathCache = {};
-  Season.register("ch1/spring", root.SpringSeason || require("../chapters/ch1/spring/season.js")); Season.use("ch1/spring"); // Spring's settings: chapters/ch1/spring/season.js (active before any table below reads R)
+  Season.register("ch1/spring", root.SpringSeason || require("../chapters/ch1/spring/season.js")); Season.use("ch1/spring"); Season.register("ch1/summer", root.SummerSeason || require("../chapters/ch1/summer/season.js")); // Summer registers too (SM2) but stays inactive until Season.use. Spring's settings: chapters/ch1/spring/season.js (active before any table below reads R)
   // ---------- seeded events (WS6 item 9) ----------
   function eventsFor(seed) { // { day: kind } for one game; mulberry32 (Tommy Ettinger's public-domain 32-bit PRNG) keeps it tiny and reproducible
     if (!seed) return Object.assign({}, R.events);
@@ -71,11 +71,17 @@
     const f = R.field;
     for (let i = 0; i < f.w * f.h; i++) s.plots.push({ i, x: f.x0 + i % f.w, y: f.y0 + Math.floor(i / f.w), tilled: i < f.w, watered: false, crop: null, sprinkler: false });
     [0, 1, 2].forEach(i => s.plots[i].crop = { age: R.growDays, cost: R.seedCost }); // WS3: three plots start ripe, so the player harvests in minute 2
-    const cash = 200 + (opt.bonus || 0), inv = s.sacks * R.unitCost + 3 * R.seedCost, loan = 100;
-    const crown = R.crownDebt;
+    let cash = 200 + (opt.bonus || 0), loan = 100, crown = R.crownDebt; const inv = s.sacks * R.unitCost + 3 * R.seedCost;
+    if (opt.carry) { // SM3: a later season starts from the closing record of the one before (closed[season].next, or Save.heir()): its cash, its debts, its relations and its flags
+      const c = opt.carry, owed = to => (c.debts || []).filter(d => d.to === to).reduce((a, d) => a + d.amount, 0);
+      cash = c.cash; loan = owed("ezra"); crown = owed("crown");
+      Object.keys(c.relations || {}).forEach(n => { s.trust[n] = c.relations[n]; });
+      s.flags = Object.assign({}, c.flags); s.carried = c.season;
+    }
     post(s, "open", "Opening balances: the estate as Uncle Edric left it", { cash, inv, loan: -loan, crown: -crown, capital: -(cash + inv - loan - crown) });
     s.opening = Object.assign({}, s.bal);
     makeOffers(s);
+    if (opt.carry) { note(s, "Summer, day 1. Cash " + cash + ", " + loan + " owed to Ezra, and " + crown.toLocaleString("en-US") + " owed to the Crown at Midwinter."); return s; }
     note(s, "Spring, day 1. Cash " + cash + ", 15 sacks in the barn, Edric's 100 loan from Ezra, and " + R.crownDebt.toLocaleString("en-US") + " owed to the Crown at Midwinter.");
     return s;
   }

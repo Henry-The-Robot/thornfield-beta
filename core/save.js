@@ -173,9 +173,12 @@
     return null;
   }
 
+  // SM3: the record a season starts from: closed[prev].next, else the canonical heir (a player who lost, skipped or never played the season before).
+  function startFrom(prev) { const c = load().closed[prev]; return c && c.next ? JSON.parse(JSON.stringify(c.next)) : heir(); }
+
   // Test hooks
   function _use(o) { if (o.store !== undefined) store = o.store; if (o.clock) clock = o.clock; cache = null; }
   root.Save = { KEY, load, write, profile, slot, saveSlot, closeSeason, markExam, clearSlot, newSeed, seedFrom, shuffleSeeded, carryFrom, migrate,
-    export: exportCode, exportCompressed, fileName, parseCode, import: importCode, persist, heir, setHeir, _use };
+    export: exportCode, exportCompressed, fileName, parseCode, import: importCode, persist, heir, setHeir, startFrom, _use };
   if (typeof module !== "undefined") module.exports = root.Save;
 })(typeof window !== "undefined" ? window : globalThis);
