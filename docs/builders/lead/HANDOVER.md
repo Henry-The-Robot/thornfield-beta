@@ -97,6 +97,12 @@ season data + market model, P6a scene player. Open PR: #54 (local/work). #53 clo
   check CI, read the diff, merge.
 
 ## Decisions made and why (newest first)
+- 2026-10-10 (Kyle, after listening on iPad): the narrator voice is great; the ElevenLabs sfx are worse than the built-in
+  synth sounds (the 2 s rain loop is choppy), so the opening keeps its synth cues (sfxFiles removed from core/intro.js;
+  assets/sfx/intro unused). Only a few lines played on iPad in v0.4.10: an <audio> element started by the timeline is
+  blocked there. v0.4.11 (merged by the Lead, PR #57) plays voice files as decoded WebAudio buffers through the shared
+  context the first tap unlocks; a line never waits more than 2.5 s behind a stuck one. The Lead built this fix itself
+  because Kyle was waiting in game; CI green incl. the new WebAudio check in tests/voice-opening.html.
 - 2026-10-06 (Kyle): test ElevenLabs voiceover + sound on the opening only; Kyle reviews, then decides for the whole
   game. Card V1 (Builder) adds audio-file playback behind `?vo=1` (the live game is unchanged). The Lead generates the
   11 opening lines (695 characters) + a few sound effects, once ElevenLabs is reachable from a Lead session. On 10-06
