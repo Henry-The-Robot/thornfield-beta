@@ -5,6 +5,7 @@
 > open (every 30 min, or run it by hand). Never git commit or push by hand.
 
 ## START HERE (every session)
+0. A fresh Lead session starts from `projects/mba-game/KICKOFF-LEAD.md` (Agent System; rewritten 2026-10-10).
 1. `python infra/help.py list --to lead:mba-game --open` first, and again before you stop.
 2. `python infra/plan_cards.py show mba-game` and `gh pr list -R Henry-The-Robot/Ledger_and_Crown --state open`.
 3. Kyle's rule (10-06): no cron, no scheduled Lead run. Act when Kyle writes or a blocking ask waits.
