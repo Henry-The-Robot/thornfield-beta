@@ -4,7 +4,8 @@
 <script>
 const sleep = ms => new Promise(r => setTimeout(r, ms)), out = [];
 const load = q => new Promise(r => { const f = document.createElement("iframe"); f.style.cssText = "width:1194px;height:834px;border:0"; f.src = "../game.html" + q; document.body.appendChild(f); f.onload = () => r(f); });
-function spy(w) { const made = []; w.Audio = function (src) { const a = { src, playing: false, paused: true, ended: false, loop: false, volume: 1, ls: {}, play() { a.playing = true; a.paused = false; return Promise.resolve(); }, pause() { a.paused = true; a.playing = false; }, addEventListener(n, fn) { (a.ls[n] = a.ls[n] || []).push(fn); }, finish() { a.ended = true; a.paused = true; (a.ls.ended || []).forEach(fn => fn()); } }; made.push(a); return a; }; return made; }
+function spy(w) { const made = []; if (w.FX) w.FX.ctx = () => null; // force the <audio> element path so the fake can watch it (section 3 checks the WebAudio path)
+  w.Audio = function (src) { const a = { src, playing: false, paused: true, ended: false, loop: false, volume: 1, ls: {}, play() { a.playing = true; a.paused = false; return Promise.resolve(); }, pause() { a.paused = true; a.playing = false; }, addEventListener(n, fn) { (a.ls[n] = a.ls[n] || []).push(fn); }, finish() { a.ended = true; a.paused = true; (a.ls.ended || []).forEach(fn => fn()); } }; made.push(a); return a; }; return made; }
 (async () => { try {
   const errs = [];
   // 1. ?vo=1: Begin starts the opening; the first voice file and the rain loop are created and playing
@@ -31,6 +32,14 @@ function spy(w) { const made = []; w.Audio = function (src) { const a = { src, p
   f = await load("?intro=1&new=1&savetest=1"); w = f.contentWindow; d = w.document; w.addEventListener("error", e => errs.push(e.message)); await sleep(400);
   made = spy(w); d.getElementById("in-go").click(); await sleep(1800); d.getElementById("in-skip").click(); await sleep(300);
   out.push(`without ?vo=1 no voice or sound file is requested: ${made.length === 0}`);
+  f.remove();
+  // 3. iPad path: with a WebAudio context the files play as decoded buffers through the shared context (an <audio> element started by a timer is silent on iPad Safari)
+  f = await load("?vo=1&intro=1&new=1&savetest=1"); w = f.contentWindow; d = w.document; w.addEventListener("error", e => errs.push(e.message)); await sleep(400);
+  d.getElementById("in-go").click(); await sleep(2500);
+  const st3 = w.Cutscene.state, first = st3 && st3.audios[0];
+  out.push(`with a WebAudio context the first voice line is a decoded buffer, not an <audio> element: ${!!first && first.kind === "webaudio" && /i01\.mp3$/.test(first.src)}`);
+  out.push(`and it is playing: ${!!first && first.playing}`);
+  d.getElementById("in-skip").click(); await sleep(300); out.push(`Skip stops it: ${!!first && !first.playing}`);
   out.push(`JS errors: ${errs.length}${errs.length ? " " + errs[0] : ""}`);
 } catch (e) { out.push("THROWN " + e.message + " " + (e.stack || "").split("\n")[1]); } document.getElementById("out").textContent = out.join("\n"); })();
 </script></body></html>

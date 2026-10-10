@@ -2,6 +2,12 @@
 
 **How to bump the version** (one command, never by hand): `node tools/stamp.js 0.4.7` writes the version into `version.js` and stamps every `?v=` in `game.html` and `index.html` (and the visible "v0.4.7" on the title page). `node tools/stamp.js --check` lists any tag that differs; `tests/test-version.js` and CI fail on a mismatch. Adding a script tag? Add it, then run `node tools/stamp.js`. The creative lead makes the release tag.
 
+## v0.4.11: the opening's voice plays on iPad
+- **Test voiceover (open the game with `?vo=1`):** the ElevenLabs narration and sound now play on iPad Safari. Each file is decoded in advance and plays through the sound channel your first tap unlocks; before, iPad blocked files the timeline started on its own.
+
+## v0.4.10: test voiceover for the opening
+- With `?vo=1` the opening plays an ElevenLabs narrator for all 11 lines, plus rain, gate, coins and seal sounds. Without it, nothing changes.
+
 ## v0.4.9: what Summer needs
 - **Your cash conversion cycle, in days** (week 3, the day after the present-value lesson): receivable days, inventory days and payable days from your own books, then you work out the cycle.
 - **Who is paid first** (week 4, Ezra): Crane's offer against what the farm owes. Debts come first, the owner last. Your answer is saved for Summer.
