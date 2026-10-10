@@ -80,8 +80,9 @@
   function say(l) { // a line starts: subtitle, and the voice file if one is set
     if (!st) return; const el = st.sub; el.innerHTML = `<span class="in-who">${l.who}</span><span class="in-txt">${l.text}</span>`; el.classList.add("on"); st.line = l.id; st.said.push(l.id);
     if (voiceBase) try { const c = clip(`${voiceBase}/${l.id}.${voiceExt}`, 1, false), prev = st.audio; st.audio = c; st.audios.push(c); // a line waits for the one before it to finish (i08 follows i07)
-      const go = () => { if (st && st.audios.indexOf(c) >= 0) c.play(); };
-      if (prev && !prev.ended) prev.after(go); else go(); } catch (e) {}
+      let fired = false; const go = () => { if (fired || !st || st.audios.indexOf(c) < 0) return; fired = true; c.play(); };
+      if (prev && !prev.ended) { prev.after(go); setTimeout(go, 2500); } else go(); } catch (e) {} // never wait more than 2.5 s behind a line that is stuck
+
   }
   // files that replace synth cues in voice mode: def.sfxFiles = [{ src, at, vol, loop, until, mute: { shotIndex: [cueIndex, ...] } }] (at/until are seconds from the start)
   function sfxFiles(t) {

@@ -120,9 +120,8 @@ window.Intro = (function () {
   // ---------- playback: the engine is core/cutscene.js; the opening is its first cutscene ----------
   const C = window.Cutscene || require("./cutscene.js");
   const DEF = { id: "opening", label: "The opening", w: W, h: H, seenKey: "lc_intro_seen", gate: `<b>Ledger &amp; Crown</b><span>Spring at Thornfield</span>`,
-    // sound files, used only in voice mode (?vo=1): they replace the synth cues named in `mute` (shot index: cue indexes)
-    sfxFiles: [{ src: "assets/sfx/intro/rain.mp3", at: 0, until: 26.2, vol: .25, loop: true }, { src: "assets/sfx/intro/gate.mp3", at: 4.5, mute: { 0: [1] } },
-      { src: "assets/sfx/intro/coins.mp3", at: 20.5, mute: { 1: [2, 3, 4, 5, 6] } }, { src: "assets/sfx/intro/seal.mp3", at: 33.0 }],
+    // Sound files could replace the synth cues in voice mode (def.sfxFiles, see core/cutscene.js). Kyle 2026-10-10: the built-in sounds are better than the
+    // ElevenLabs effects (the 2-second rain loop sounded choppy), so the opening keeps its synth cues and only the narration is a file. assets/sfx/intro/ is unused.
     shots: SHOTS.map((s, i) => Object.assign({}, s, { draw: DRAW[i] })), lines: SCRIPT, setup: c => { ctx = c; } };
   if (C.register) C.register(DEF);
   const setVoice = C.setVoice, manifest = () => C.manifest(DEF);
